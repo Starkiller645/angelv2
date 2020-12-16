@@ -1,0 +1,33 @@
+cmake_minimum_required(VERSION 3.1.0)
+
+project(angelv1 VERSION 1.0.01 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+if(CMAKE_VERSION VERSION_LESS "3.7.0")
+    set(CMAKE_INCLUDE_CURRENT_DIR ON)
+endif()
+
+find_package(Qt5 COMPONENTS Widgets REQUIRED)
+find_package(Qt5 COMPONENTS Network REQUIRED)
+find_package(Qt5 COMPONENTS WebSockets REQUIRED)
+find_package(Qt5 COMPONENTS WebEngineWidgets REQUIRED)
+include(FetchContent)
+add_definitions(-DQT_DEBUG_OUTPUT)
+
+FetchContent_Declare(cpr GIT_REPOSITORY https://github.com/whoshuu/cpr.git GIT_TAG c8d33915dbd88ad6c92b258869b03aba06587ff9)
+FetchContent_MakeAvailable(cpr)
+
+add_executable(angelv1
+    src/mainwindow.cpp
+    src/main.cpp
+    src/authworker.cpp
+)
+
+target_link_libraries(angelv1 Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Network Qt5::WebSockets)
+target_link_libraries(angelv1 cpr::cpr)
