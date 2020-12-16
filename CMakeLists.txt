@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+set(USE_SYSTEM_CURL ON)
+set(BUILD_CPR_TESTS OFF)
 
 if(CMAKE_VERSION VERSION_LESS "3.7.0")
     set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -29,5 +31,5 @@ add_executable(angelv1
     src/authworker.cpp
 )
 
-target_link_libraries(angelv1 Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Network Qt5::WebSockets)
+target_link_libraries(angelv1 Qt5::Widgets Qt5::WebEngineWidgets  Qt5::Core Qt5::Gui Qt5::Network Qt5::WebSockets)
 target_link_libraries(angelv1 cpr::cpr)
