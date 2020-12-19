@@ -30,10 +30,7 @@ std::string httpsend;
 
 
 AuthorisationWorker::AuthorisationWorker() {
-  std::cout << "Created instance of AuthorisationWorker" << std::endl;
-  /*sQWebSocketServer sock_server(QStringLiteral("Reddit Data Server"),
-                                     QWebSocketServer::NonSecureMode,
-                                     this);*/
+  return;
 }
 
 void AuthorisationWorker::run() {
@@ -64,7 +61,6 @@ void AuthorisationWorker::run() {
   if(n < 0) {
     std::cout << "ERROR while read from socket\n";
   };
-  std::cout << "Message received: " << buffer << std::endl;
   if(n < 0) {
     std::cout << "ERROR while write to socket\n";
   }
@@ -74,7 +70,6 @@ void AuthorisationWorker::run() {
 };
 
 void AuthorisationWorker::capture_signal() {
-  std::cout << "New connection incoming" << std::endl;
   /*QObject::connect(connection, &QTcpSocket::textMessageReceived, this, &AuthorisationWorker::onEchoReceived);*/
 }
 

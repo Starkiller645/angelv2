@@ -9,7 +9,7 @@ using namespace Qt;
 using namespace mainwindow;
 int main(int argc, char *argv[]) {
   QApplication app(argc, argv);
-  app.setWindowIcon(QIcon("/opt/angel-reddit/angel.ico"));
+  app.setWindowIcon(QIcon(":/images/angel.ico"));
   /*app.setStyle("breeze");*/
   MainWindow window;
   return app.exec();

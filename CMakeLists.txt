@@ -24,12 +24,28 @@ add_definitions(-DQT_DEBUG_OUTPUT)
 
 FetchContent_Declare(cpr GIT_REPOSITORY https://github.com/whoshuu/cpr.git GIT_TAG c8d33915dbd88ad6c92b258869b03aba06587ff9)
 FetchContent_MakeAvailable(cpr)
+FetchContent_Declare(json
+  GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
+  GIT_TAG v3.9.1)
+
+FetchContent_GetProperties(json)
+if(NOT json_POPULATED)
+  FetchContent_Populate(json)
+  add_subdirectory(${json_SOURCE_DIR} ${json_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 add_executable(angelv1
     src/mainwindow.cpp
     src/main.cpp
     src/authworker.cpp
+    src/transparentbutton.cpp
+    src/filejson.cpp
+    src/mainui.cpp
+    src/subredditwidget.cpp
+    resources.qrc
 )
 
 target_link_libraries(angelv1 Qt5::Widgets Qt5::WebEngineWidgets  Qt5::Core Qt5::Gui Qt5::Network Qt5::WebSockets)
-target_link_libraries(angelv1 cpr::cpr)
+target_link_libraries(angelv1 cpr::cpr nlohmann_json::nlohmann_json)
+
+install(TARGETS angelv1)
