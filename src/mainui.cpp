@@ -1,13 +1,18 @@
 #include "mainui.h"
 #include "subredditwidget.h"
+#include "submissionwidget.h"
+#include "filejson.h"
 
 #include <QWidget>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QPropertyAnimation>
 #include <QTimer>
+#include <QThreadPool>
 #include <iostream>
 #include <string>
+#include <cpr/cpr.h>
+#include <nlohmann/json.hpp>
 
 mainui::MainUI::MainUI() {
   this->sideBarWidget = new QWidget();
@@ -28,6 +33,23 @@ mainui::MainUI::MainUI() {
   this->mainLayout = new QHBoxLayout();
   this->submissionsLayout = new QHBoxLayout();
 
+
+  QThreadPool *threadpool = new QThreadPool();
+  std::string filename = "/home/jacob/.config/angel.json";
+  filejson::JsonRead *json = new filejson::JsonRead(filename);
+  this->jsondata = json->runSynced();
+  cpr::Url url{"https://oauth.reddit.com/r/linux/hot"};
+  std::cout << this->jsondata.dump() << std::endl;
+  std::string authparam = jsondata["access_token"];
+  authparam = "bearer " + authparam;
+  std::cout << authparam << std::endl;
+  cpr::Header headers{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}};
+  cpr::Response response = cpr::Get(url, headers);
+  std::cout << response.header["g"];
+  std::cout << response.status_code;
+  auto json_response = nlohmann::json::parse(response.text);
+  std::cout << "First post: " << json_response["data"]["children"][0]["data"]["title"] << std::endl;
+
   this->sideBarLayout = new QVBoxLayout();
   this->displayLayout = new QVBoxLayout();
   this->viewLayout = new QVBoxLayout();
@@ -39,6 +61,15 @@ mainui::MainUI::MainUI() {
   this->bottomBarWidget->setStyleSheet("background-color: #eff0f1;");
   this->subredditWidget->setMaximumHeight(120);
   this->subListWidget->setStyleSheet("background-color: #232629;");
+  QVBoxLayout *subListLayout = new QVBoxLayout;
+  std::string test_title = json_response["data"]["children"][0]["data"]["title"];
+  std::string test_body = "This is a test of the submission widget. Lorem ipsum dolor sit amet...";
+  std::string test_author = json_response["data"]["children"][0]["data"]["author_fullname"];
+  std::string test_id = "t3_skofenwio";
+  int test_score = 30144;
+  submissionwidget::SubmissionWidget *test_submission_widget = new submissionwidget::SubmissionWidget(test_title, test_body, test_author, test_score, test_id, submissionwidget::submission_type::Text);
+  subListLayout->addWidget(test_submission_widget);
+  this->subListWidget->setLayout(subListLayout);
   this->toolBarWidget->setStyleSheet("background-color: #31363b;");
   this->toolBarWidget->setMaximumWidth(60);
   this->subListWidget->setMinimumWidth(440);
@@ -85,7 +116,7 @@ mainui::MainUI::MainUI() {
   QTimer *timer_animation2 = new QTimer(this);
   timer_animation2->setSingleShot(true);
   QObject::connect(timer_animation2, &QTimer::timeout, this, &mainui::MainUI::toggleSideBar);
-  timer_animation2->start(3300);
+  timer_animation2->start(4500);
 }
 
 void mainui::MainUI::toggleSideBar() {

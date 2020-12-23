@@ -42,6 +42,7 @@ add_executable(angelv1
     src/filejson.cpp
     src/mainui.cpp
     src/subredditwidget.cpp
+    src/submissionwidget.cpp
     resources.qrc
 )
 

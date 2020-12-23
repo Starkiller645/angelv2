@@ -6,6 +6,7 @@
 #include <iostream>
 #include <QMainWindow>
 #include <QtWebEngineWidgets>
+#include <nlohmann/json.hpp>
 
 using namespace Qt;
 
@@ -24,6 +25,7 @@ namespace mainwindow {
     std::string bearer_token;
     std::string refresh_token;
     QVBoxLayout *mainLayout;
+    nlohmann::json conf_json;
   };
 }
 #endif

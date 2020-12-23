@@ -21,10 +21,11 @@ namespace filejson {
   class JsonRead : public QObject, public QRunnable {
     Q_OBJECT
   signals:
-    nlohmann::json onJsonRead();
+    void onJsonRead(nlohmann::json);
   public:
     JsonRead(std::string);
     void run() override;
+    nlohmann::json runSynced();
   private:
     std::string json_dump;
     std::ifstream file_read;

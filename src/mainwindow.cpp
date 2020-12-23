@@ -66,7 +66,7 @@ void MainWindow::runConnect(){
   QThreadPool *threadpool = new QThreadPool();
   authworker::AuthorisationWorker *receive = new authworker::AuthorisationWorker();
   this->authsite->setWindowTitle("Authenticate with Reddit");
-  this->authsite->load(QUrl("https://www.reddit.com/api/v1/authorize.compact?client_id=Jq0BiuUeIrsr3A&response_type=code&state=JDOfne0oPnf&redirect_uri=http://localhost:8080&duration=permanent&scope=identity"));
+  this->authsite->load(QUrl("https://www.reddit.com/api/v1/authorize.compact?client_id=Jq0BiuUeIrsr3A&response_type=code&state=JDOfne0oPnf&redirect_uri=http://localhost:8080&duration=permanent&scope=identity+read"));
   threadpool->start(receive);
   this->authsite->show();
   connect(receive, &authworker::AuthorisationWorker::onResponseReceived, this, &MainWindow::onResponseReceived);
@@ -96,7 +96,7 @@ void MainWindow::onResponseReceived(QString request_qstr) {
   this->mainWidget->deleteLater();
   this->mainWidget = new QWidget();
   cpr::Response get_credentials = cpr::Get(cpr::Url{"https://oauth.reddit.com/api/v1/me"},
-                                  cpr::Header{{"User-Agent", "linux:com.example.angel:v1.0 (by /u/Starkiller645)"}, {"Authorization", "bearer " + this->bearer_token}}
+                                  cpr::Header{{"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"Authorization", "bearer " + this->bearer_token}}
                                   );
 
   auto get_credentials_json = json::parse(get_credentials.text);
@@ -105,14 +105,20 @@ void MainWindow::onResponseReceived(QString request_qstr) {
 
   json cred_json;
   cred_json["client_id"] = "Jq0BiuUeIrsr3A";
-  cred_json["user_agent"] = "linux:com.example.angel:v1.0 (by /u/Starkiller645)";
+  cred_json["user_agent"] = "angel/v1.0 (by /u/Starkiller645)";
   cred_json["refresh_token"] = this->refresh_token;
+  cred_json["access_token"] = this->bearer_token;
 
   QThreadPool *write_thread = new QThreadPool();
   std::string filename = std::getenv("HOME");
   filename += "/.config/angel.json";
   filejson::JsonWrite *write_json = new filejson::JsonWrite(cred_json, filename);
   write_json->run();
+
+  filejson::JsonRead *read_json = new filejson::JsonRead(filename);
+  QObject::connect(read_json, &filejson::JsonRead::onJsonRead, this, [=](json json_read){this->conf_json = json_read;});
+  read_json->run();
+  std::cout << "OAuth 2 access token: " << this->conf_json["access_token"] << std::endl << "OAuth 2 refresh token: " << this->conf_json["refresh_token"] << std::endl;
 
   QWidget *labels_container = new QWidget();
   const QIcon next_icon(":/images/next.svg");

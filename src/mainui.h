@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <nlohmann/json.hpp>
 
 #include "subredditwidget.h"
 
@@ -25,6 +26,7 @@ namespace mainui {
     QVBoxLayout *viewLayout;
     QWidget *bodyWidget;
     QWidget *bottomBarWidget;
+    nlohmann::json jsondata;
   public:
     MainUI();
     void setup();

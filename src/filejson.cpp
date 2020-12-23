@@ -28,4 +28,13 @@ void filejson::JsonRead::run() {
   filestream.open(this->filename);
   filestream >> this->jobj;
   filestream.close();
+  emit this->onJsonRead(this->jobj);
+}
+
+nlohmann::json filejson::JsonRead::runSynced() {
+  std::ifstream filestream;
+  filestream.open(this->filename);
+  filestream >> this->jobj;
+  filestream.close();
+  return this->jobj;
 }
