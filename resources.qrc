@@ -8,5 +8,6 @@
 	<file>images/icon-text.svg</file>
 	<file>images/icon-image.svg</file>
 	<file>images/icon-video.svg</file>
+	<file>resources/scrollbar.qss</file>
 </qresource>
 </RCC>

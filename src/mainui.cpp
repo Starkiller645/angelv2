@@ -26,6 +26,7 @@ mainui::MainUI::MainUI() {
   this->subListWidget = new QWidget();
   this->displayWidget = new QWidget();
   this->topBarWidget = new QWidget();
+  this->subScroll = new QScrollArea();
   this->viewWidget = new QWidget();
   this->bodyWidget = new QWidget();
   this->bottomBarWidget = new QWidget();
@@ -43,7 +44,7 @@ mainui::MainUI::MainUI() {
   std::string authparam = jsondata["access_token"];
   authparam = "bearer " + authparam;
   std::cout << authparam << std::endl;
-  cpr::Header headers{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}};
+  cpr::Header headers{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
   cpr::Response response = cpr::Get(url, headers);
   std::cout << response.header["g"];
   std::cout << response.status_code;
@@ -67,12 +68,48 @@ mainui::MainUI::MainUI() {
   std::string test_author = json_response["data"]["children"][0]["data"]["author_fullname"];
   std::string test_id = "t3_skofenwio";
   int test_score = 30144;
-  submissionwidget::SubmissionWidget *test_submission_widget = new submissionwidget::SubmissionWidget(test_title, test_body, test_author, test_score, test_id, submissionwidget::submission_type::Text);
-  subListLayout->addWidget(test_submission_widget);
+
+  std::vector<nlohmann::json> submission_json_list;
+  std::vector<submissionwidget::SubmissionWidget *> submission_widget_list;
+
+  for(int i = 0; i < 25; i++) {
+    nlohmann::json temp_json = json_response["data"]["children"][i];
+    submission_json_list.push_back(temp_json);
+    std::cout << "Got submission: " << i << ": " << submission_json_list[i]["data"]["title"] << std::endl;
+  }
+
+  for(int i = 0; i < submission_json_list.size(); i++) {
+    std::cout << "[DBG] Getting temp score..." << std::endl;
+    std::cout << submission_json_list.at(i).dump() << std::endl;
+    /*int temp_score = std::stoi(
+      std::string(submission_json_list.at(i)["data"]["ups"])) - std::stoi(
+      std::string(submission_json_list.at(i)["data"]["downs"]));*/
+    std::cout << "[DBG] Done\n[DBG] Setting up temp widget" << std::endl;
+    submissionwidget::SubmissionWidget *temp_widget = new submissionwidget::SubmissionWidget(
+      submission_json_list.at(i)["data"]["title"],
+      submission_json_list.at(i)["data"]["selftext"],
+      submission_json_list.at(i)["data"]["author"],
+      0,
+      std::to_string(i),
+      submissionwidget::Text
+    );
+    std::cout << "[DBG] Done\n[DBG] Adding widget to list and layout" << std::endl;
+
+    temp_widget->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+    temp_widget->setFixedHeight(150);
+    temp_widget->setMinimumWidth(100);
+
+    submission_widget_list.push_back(temp_widget);
+    subListLayout->addWidget(temp_widget);
+  }
+
   this->subListWidget->setLayout(subListLayout);
+  this->subListWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   this->toolBarWidget->setStyleSheet("background-color: #31363b;");
   this->toolBarWidget->setMaximumWidth(60);
-  this->subListWidget->setMinimumWidth(440);
+  this->subScroll->setMinimumWidth(440);
+  this->subScroll->setWidgetResizable(true);
+  this->subScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   this->bottomBarWidget->setMaximumHeight(60);
   this->topBarWidget->setFixedHeight(120);
 
@@ -89,9 +126,10 @@ mainui::MainUI::MainUI() {
   this->displayLayout->setSpacing(0);
   this->viewLayout->setMargin(0);
   this->submissionsLayout->addWidget(this->toolBarWidget);
-  this->submissionsLayout->addWidget(this->subListWidget);
+  this->subScroll->setWidget(this->subListWidget);
+  this->submissionsLayout->addWidget(this->subScroll);
   this->submissionsWidget->setLayout(this->submissionsLayout);
-  this->subListWidget->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+  this->subScroll->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
   this->sideBarLayout->addWidget(this->subredditWidget);
   this->sideBarLayout->addWidget(this->submissionsWidget);
   this->sideBarWidget->setFixedWidth(500);
@@ -120,14 +158,14 @@ mainui::MainUI::MainUI() {
 }
 
 void mainui::MainUI::toggleSideBar() {
-  if(this->toolBarWidget->maximumWidth() > 60 && this->subListWidget->minimumWidth() < 440) {
+  if(this->toolBarWidget->maximumWidth() > 60 && this->subScroll->minimumWidth() < 440) {
     QPropertyAnimation *toolbar_anim = new QPropertyAnimation(this->toolBarWidget, "maximumWidth");
     toolbar_anim->setStartValue(this->toolBarWidget->maximumWidth());
     toolbar_anim->setEndValue(60);
     toolbar_anim->setDuration(600);
 
-    QPropertyAnimation *sublist_anim = new QPropertyAnimation(this->subListWidget, "minimumWidth");
-    sublist_anim->setStartValue(this->subListWidget->minimumWidth());
+    QPropertyAnimation *sublist_anim = new QPropertyAnimation(this->subScroll, "minimumWidth");
+    sublist_anim->setStartValue(this->subScroll->minimumWidth());
     sublist_anim->setEndValue(440);
     sublist_anim->setDuration(600);
 
@@ -141,8 +179,8 @@ void mainui::MainUI::toggleSideBar() {
     toolbar_anim->setEndValue(500);
     toolbar_anim->setDuration(600);
 
-    QPropertyAnimation *sublist_anim = new QPropertyAnimation(this->subListWidget, "minimumWidth");
-    sublist_anim->setStartValue(this->subListWidget->minimumWidth());
+    QPropertyAnimation *sublist_anim = new QPropertyAnimation(this->subScroll, "minimumWidth");
+    sublist_anim->setStartValue(this->subScroll->minimumWidth());
     sublist_anim->setEndValue(0);
     sublist_anim->setDuration(600);
 

@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QScrollArea>
 #include <nlohmann/json.hpp>
 
 #include "subredditwidget.h"
@@ -15,6 +16,7 @@ namespace mainui {
     QWidget *sideBarWidget;
     QVBoxLayout *sideBarLayout;
     subredditwidget::SubredditWidget *subredditWidget;
+    QScrollArea *subScroll;
     QWidget *submissionsWidget;
     QHBoxLayout *submissionsLayout;
     QWidget *toolBarWidget;
