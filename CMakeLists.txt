@@ -19,6 +19,13 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 find_package(Qt5 COMPONENTS Network REQUIRED)
 find_package(Qt5 COMPONENTS WebSockets REQUIRED)
 find_package(Qt5 COMPONENTS WebEngineWidgets REQUIRED)
+find_package(CURL)
+if(CURL_FOUND)
+    include_directories(${CURL_INCLUDE_DIR})
+    set(requiredlibs ${requiredlibs} ${CURL_LIBRARIES})
+else(CURL_FOUND)
+    message(FATAL_ERROR "Could not find CURL library")
+endif(CURL_FOUND)
 include(FetchContent)
 add_definitions(-DQT_DEBUG_OUTPUT)
 
@@ -43,6 +50,7 @@ add_executable(angelv1
     src/mainui.cpp
     src/subredditwidget.cpp
     src/submissionwidget.cpp
+    src/redditasyncrequest.cpp
     resources.qrc
 )
 

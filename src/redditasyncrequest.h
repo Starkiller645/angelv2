@@ -9,27 +9,26 @@
 
 namespace redasync {
   enum request_type {PostRequest, GetRequest, PatchRequest};
-  class AsyncRequest : public QRunnable {
+  class AsyncRequest : public QObject, public QRunnable {
     Q_OBJECT
   public:
-    AsyncRequest(redasync::request_type, cpr::Url, cpr::Header, cpr::Parameters);
+    AsyncRequest(redasync::request_type, cpr::Url, cpr::Header);
     void run() override;
+    cpr::Response runSynced();
   signals:
     void request_received(std::string);
     void request_received_json(nlohmann::json);
   private:
     nlohmann::json jsonResponse;
     redasync::request_type requestType;
-    std::string endpointUri;
+    cpr::Url endpointUri;
     cpr::Header requestHeaders;
-    cpr::Payload postPayload;
     cpr::Parameters getParams;
-    cpr::Payload patchJson;
-    cpr::Authentication
-    cpr::Get getRequest;
-    cpr::Post postRequest;
-    cpr::Patch patchRequest;
-  }
+    cpr::Parameters patchJson;
+    cpr::Response getRequest;
+    cpr::Response postRequest;
+    cpr::Response patchRequest;
+  };
 }
 
 #endif

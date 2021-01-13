@@ -43,7 +43,7 @@ void AuthorisationWorker::run() {
     std::cout << "Reddit Authorisation Worker listening on port 8080" << std::endl;*/
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   bzero((char *) &serv_addr, sizeof(serv_addr));
-  portno = 8080;
+  portno = 8800;
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   serv_addr.sin_port = htons(portno);

@@ -66,7 +66,7 @@ void MainWindow::runConnect(){
   QThreadPool *threadpool = new QThreadPool();
   authworker::AuthorisationWorker *receive = new authworker::AuthorisationWorker();
   this->authsite->setWindowTitle("Authenticate with Reddit");
-  this->authsite->load(QUrl("https://www.reddit.com/api/v1/authorize.compact?client_id=Jq0BiuUeIrsr3A&response_type=code&state=JDOfne0oPnf&redirect_uri=http://localhost:8080&duration=permanent&scope=identity+read"));
+  this->authsite->load(QUrl("https://www.reddit.com/api/v1/authorize.compact?client_id=Jq0BiuUeIrsr3A&response_type=code&state=JDOfne0oPnf&redirect_uri=http://localhost:8800&duration=permanent&scope=identity+read"));
   threadpool->start(receive);
   this->authsite->show();
   connect(receive, &authworker::AuthorisationWorker::onResponseReceived, this, &MainWindow::onResponseReceived);
@@ -84,8 +84,8 @@ void MainWindow::onResponseReceived(QString request_qstr) {
   const char *token_c = token.c_str();
   //this->authsite->hide();
   cpr::Parameter code{"code", token_c};
-  std::string post_body = "grant_type=authorization_code&code=" + token + "&redirect_uri=http://localhost:8080";
-  cpr::Payload params{{"grant_type", "authorization_code"}, {"code", token_c}, {"redirect_uri", "http://localhost:8080"}};
+  std::string post_body = "grant_type=authorization_code&code=" + token + "&redirect_uri=http://localhost:8800";
+  cpr::Payload params{{"grant_type", "authorization_code"}, {"code", token_c}, {"redirect_uri", "http://localhost:8800"}};
   this->authsite->deleteLater();
   cpr::Response resp = cpr::Post(cpr::Url{"https://www.reddit.com/api/v1/access_token"},
                                  cpr::Header{{"User-Agent", "linux:com.example.angel:v1.0 (by /u/Starkiller645)"}, {"Authorization", "Basic SnEwQml1VWVJcnNyM0E6"}},

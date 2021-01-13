@@ -8,6 +8,8 @@
 #include <QScrollArea>
 #include <QLineEdit>
 #include <nlohmann/json.hpp>
+#include <cpr/cpr.h>
+#include <curl/curl.h>
 
 #include "subredditwidget.h"
 
@@ -33,7 +35,19 @@ namespace mainui {
     QWidget *bodyWidget;
     QWidget *bottomBarWidget;
     QVBoxLayout *subListLayout;
+    QVBoxLayout *topBarLayout;
+    QWidget *topBarInfoWidget;
+    QHBoxLayout *topBarInfoLayout;
+    QLabel *upvoteInfoWidget;
+    QLabel *titleWidget;
+    QLabel *authorInfoWidget;
+    QLabel *subredditInfoWidget;
+    QLabel *subredditIconWidget;
     nlohmann::json jsondata;
+    nlohmann::json json_response;
+    nlohmann::json json_about;
+    cpr::Header headers;
+    std::vector<nlohmann::json> submission_json_list;
 
     QPushButton *searchButton;
     QPushButton *goButton;
@@ -43,6 +57,8 @@ namespace mainui {
     void setup();
     void toggleSideBar(SidebarButton);
     void switchSub(std::string);
+    void view(int);
+    static size_t writeBinaryData(void*, size_t, size_t, FILE*);
   };
 }
 

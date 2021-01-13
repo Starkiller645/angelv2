@@ -2,6 +2,7 @@
 #include "subredditwidget.h"
 #include "submissionwidget.h"
 #include "filejson.h"
+#include "redditasyncrequest.h"
 
 #include <QWidget>
 #include <QHBoxLayout>
@@ -9,14 +10,17 @@
 #include <QPropertyAnimation>
 #include <QTimer>
 #include <QIcon>
+#include <QFile>
 #include <QThreadPool>
 #include <iostream>
 #include <string>
 #include <QLineEdit>
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
+#include <curl/curl.h>
 
 mainui::MainUI::MainUI() {
+  //Top level primary widgets
   this->sideBarWidget = new QWidget();
   this->subredditWidget = new subredditwidget::SubredditWidget;
   std::string subName = "<b>frontpage</b>";
@@ -29,6 +33,20 @@ mainui::MainUI::MainUI() {
   this->subListWidget = new QWidget();
   this->displayWidget = new QWidget();
   this->topBarWidget = new QWidget();
+  this->sideBarLayout = new QVBoxLayout();
+  this->displayLayout = new QVBoxLayout();
+  this->viewLayout = new QVBoxLayout();
+
+  // Nested inside topBarWidget
+  this->topBarLayout = new QVBoxLayout();
+  this->topBarInfoWidget = new QWidget();
+  this->topBarInfoLayout = new QHBoxLayout();
+  this->upvoteInfoWidget = new QLabel();
+  this->titleWidget = new QLabel();
+  this->authorInfoWidget = new QLabel();
+  this->subredditInfoWidget = new QLabel();
+  this->subredditIconWidget = new QLabel();
+
   this->subScroll = new QScrollArea();
   this->viewWidget = new QWidget();
   this->subListLayout = new QVBoxLayout();
@@ -41,10 +59,6 @@ mainui::MainUI::MainUI() {
   this->submissionsLayout = new QHBoxLayout();
 
   this->switchSub("frontpage");
-
-  this->sideBarLayout = new QVBoxLayout();
-  this->displayLayout = new QVBoxLayout();
-  this->viewLayout = new QVBoxLayout();
 
   this->subredditWidget->setStyleSheet("background-color: #232629;");
   this->submissionsWidget->setStyleSheet("background-color: #232629; border: 0px;");
@@ -64,6 +78,18 @@ mainui::MainUI::MainUI() {
   this->subScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   this->bottomBarWidget->setMaximumHeight(60);
   this->topBarWidget->setFixedHeight(120);
+  this->topBarWidget->setLayout(this->topBarLayout);
+  this->topBarLayout->addWidget(this->titleWidget);
+  this->topBarLayout->addWidget(this->topBarInfoWidget);
+  this->topBarInfoWidget->setLayout(this->topBarInfoLayout);
+  this->topBarInfoLayout->addWidget(this->upvoteInfoWidget);
+  this->topBarInfoLayout->addWidget(this->authorInfoWidget);
+  this->topBarInfoLayout->addWidget(this->subredditIconWidget);
+  this->topBarInfoLayout->addWidget(this->subredditInfoWidget);
+  this->subredditInfoWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+  this->titleWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+  this->topBarInfoLayout->setAlignment(Qt::AlignBottom | Qt::AlignLeft);
+  this->titleWidget->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
 
   this->mainLayout->setMargin(0);
   this->mainLayout->setSpacing(0);
@@ -201,10 +227,10 @@ void mainui::MainUI::switchSub(std::string sub) {
   cpr::Url about_url{"https://oauth.reddit.com/r/" + sub + "/about"};
   std::string authparam = jsondata["access_token"];
   authparam = "bearer " + authparam;
-  cpr::Header headers{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
-  cpr::Response response = cpr::Get(url, headers);
-  cpr::Response about_sub = cpr::Get(about_url, headers);
-  auto json_about = nlohmann::json::parse(about_sub.text);
+  this->headers = cpr::Header{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
+  cpr::Response response = cpr::Get(url, this->headers);
+  cpr::Response about_sub = cpr::Get(about_url, this->headers);
+  this->json_about = nlohmann::json::parse(about_sub.text);
   if(sub != "frontpage") {
     this->subredditWidget->setSubscribers(json_about["data"]["subscribers"]);
     this->subredditWidget->setOnlineSubscribers(json_about["data"]["active_user_count"]);
@@ -212,12 +238,11 @@ void mainui::MainUI::switchSub(std::string sub) {
     this->subredditWidget->setSubscribers(1);
     this->subredditWidget->setOnlineSubscribers(1);
   };
-  cpr::Response frontpage_response = cpr::Get(frontpage_url, headers);
-  auto json_response = nlohmann::json::parse(response.text);
+  cpr::Response frontpage_response = cpr::Get(frontpage_url, this->headers);
+  this->json_response = nlohmann::json::parse(response.text);
   auto json_frontpage = nlohmann::json::parse(frontpage_response.text);
   std::cout << "First post: " << json_response["data"]["children"][0]["data"]["title"] << std::endl;
 
-  std::vector<nlohmann::json> submission_json_list;
   std::vector<submissionwidget::SubmissionWidget *> submission_widget_list;
 
   QLayoutItem *child;
@@ -226,24 +251,26 @@ void mainui::MainUI::switchSub(std::string sub) {
       delete child;
   };
 
+  this->submission_json_list.clear();
+
   for(int i = 0; i < 25; i++) {
     if(sub == "frontpage") {
       nlohmann::json temp_json = json_frontpage["data"]["children"][i];
-      submission_json_list.push_back(temp_json);
+      this->submission_json_list.push_back(temp_json);
     } else {
       nlohmann::json temp_json = json_response["data"]["children"][i];
-      submission_json_list.push_back(temp_json);
+      this->submission_json_list.push_back(temp_json);
     }
   }
 
-  for(int i = 0; i < submission_json_list.size(); i++) {
-    int ups = submission_json_list[i]["data"]["ups"];
-    int downs = submission_json_list[i]["data"]["downs"];
+  for(int i = 0; i < this->submission_json_list.size(); i++) {
+    int ups = this->submission_json_list[i]["data"]["ups"];
+    int downs = this->submission_json_list[i]["data"]["downs"];
     signed int score = ups - downs;
     submissionwidget::SubmissionWidget *temp_widget = new submissionwidget::SubmissionWidget(
-      submission_json_list.at(i)["data"]["title"],
-      submission_json_list.at(i)["data"]["selftext"],
-      submission_json_list.at(i)["data"]["author"],
+      this->submission_json_list.at(i)["data"]["title"],
+      this->submission_json_list.at(i)["data"]["selftext"],
+      this->submission_json_list.at(i)["data"]["author"],
       score,
       i,
       submissionwidget::Text
@@ -254,4 +281,52 @@ void mainui::MainUI::switchSub(std::string sub) {
     submission_widget_list.push_back(temp_widget);
     subListLayout->addWidget(temp_widget);
   }
+  std::cout << this->json_about["data"]["icon_img"] << std::endl;
+  std::cout << this->json_about.dump() << std::endl;
+  std::cout << std::string(this->json_about["data"]["icon_img"]).c_str() << std::endl;
+  this->view(1);
+}
+
+void mainui::MainUI::view(int id) {
+  nlohmann::json temp_json = this->submission_json_list[id];
+  this->titleWidget->setText(QString(std::string(temp_json["data"]["title"]).c_str()));
+  this->titleWidget->setStyleSheet("font-weight: bold; font-size: 40px; padding: 8px 3px;");
+  signed int score = int(temp_json["data"]["ups"]) - int(temp_json["data"]["downs"]);
+  this->topBarInfoWidget->setStyleSheet("padding: 8px 3px;");
+  this->upvoteInfoWidget->setText(QString(std::to_string(score).c_str()));
+  this->upvoteInfoWidget->setStyleSheet("color: #ff4500; font-weight: bold;");
+  std::string author = "u/";
+  author += std::string(temp_json["data"]["author"]);
+  this->authorInfoWidget->setText(QString(author.c_str()));
+  this->authorInfoWidget->setStyleSheet("color: #0dd3bb;");
+  this->subredditInfoWidget->setStyleSheet("font-weight: bold; font-size: 30px;");
+  cpr::Url icon_url(std::string(this->json_about["data"]["icon_img"]));
+  cpr::Header headers = this->headers;
+  CURL *curl;
+  FILE *fp;
+  CURLcode res;
+  char buffer[CURL_ERROR_SIZE];
+  std::string url_prev = std::string(this->json_about["data"]["icon_img"]);
+  char outfilename[FILENAME_MAX] = "/opt/angel-reddit/temp/.subimg.png";
+  curl = curl_easy_init();
+  if (curl) {
+      fp = fopen(outfilename,"wb");
+      curl_easy_setopt(curl, CURLOPT_URL, url_prev.c_str());
+      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
+      curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+      curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, buffer);
+      res = curl_easy_perform(curl);
+      std::cout << res << std::endl;
+      /* always cleanup */
+      curl_easy_cleanup(curl);
+      fclose(fp);
+      std::cout << buffer << std::endl;
+  }
+  this->subredditIconWidget->setPixmap(QPixmap("/opt/angel-reddit/temp/.subimg.png").scaled(30, 30));
+  this->subredditInfoWidget->setText(QString(std::string(this->json_about["data"]["display_name"]).c_str()));
+}
+
+size_t mainui::MainUI::writeBinaryData(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+    size_t written = fwrite(ptr, size, nmemb, stream);
+    return written;
 }
