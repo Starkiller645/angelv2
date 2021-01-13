@@ -4,12 +4,15 @@
 #include <QWidget>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QPushButton>
 #include <QScrollArea>
+#include <QLineEdit>
 #include <nlohmann/json.hpp>
 
 #include "subredditwidget.h"
 
 namespace mainui {
+  enum SidebarButton {Search, Self, Frontpage, Settings};
   class MainUI : public QWidget {
     QWidget *mainWidget;
     QHBoxLayout *mainLayout;
@@ -20,6 +23,7 @@ namespace mainui {
     QWidget *submissionsWidget;
     QHBoxLayout *submissionsLayout;
     QWidget *toolBarWidget;
+    QVBoxLayout *toolBarLayout;
     QWidget *subListWidget;
     QWidget *displayWidget;
     QVBoxLayout *displayLayout;
@@ -28,12 +32,17 @@ namespace mainui {
     QVBoxLayout *viewLayout;
     QWidget *bodyWidget;
     QWidget *bottomBarWidget;
+    QVBoxLayout *subListLayout;
     nlohmann::json jsondata;
+
+    QPushButton *searchButton;
+    QPushButton *goButton;
+    QLineEdit *searchTextEdit;
   public:
     MainUI();
     void setup();
-  public slots:
-    void toggleSideBar();
+    void toggleSideBar(SidebarButton);
+    void switchSub(std::string);
   };
 }
 

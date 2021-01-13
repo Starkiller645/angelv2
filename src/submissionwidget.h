@@ -13,7 +13,7 @@ namespace submissionwidget {
   class SubmissionWidget : public QPushButton {
     Q_OBJECT
   public:
-    SubmissionWidget(std::string, std::string, std::string, int, std::string, submissionwidget::submission_type);
+    SubmissionWidget(std::string, std::string, std::string, int, int, submissionwidget::submission_type);
   private:
     QLabel *submission_title;
     QLabel *submission_icon;
