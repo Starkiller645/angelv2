@@ -33,6 +33,8 @@ namespace mainui {
     QWidget *viewWidget;
     QVBoxLayout *viewLayout;
     QWidget *bodyWidget;
+    QVBoxLayout *bodyLayout;
+    QLabel *selftextWidget;
     QWidget *bottomBarWidget;
     QVBoxLayout *subListLayout;
     QVBoxLayout *topBarLayout;

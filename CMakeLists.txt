@@ -41,6 +41,11 @@ if(NOT json_POPULATED)
   add_subdirectory(${json_SOURCE_DIR} ${json_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
+
+add_library(maddy INTERFACE)
+target_include_directories(maddy INTERFACE include/maddy)
+
+
 add_executable(angelv1
     src/mainwindow.cpp
     src/main.cpp
@@ -56,5 +61,6 @@ add_executable(angelv1
 
 target_link_libraries(angelv1 Qt5::Widgets Qt5::WebEngineWidgets  Qt5::Core Qt5::Gui Qt5::Network Qt5::WebSockets)
 target_link_libraries(angelv1 cpr::cpr nlohmann_json::nlohmann_json)
+target_link_libraries(angelv1 maddy)
 
 install(TARGETS angelv1)

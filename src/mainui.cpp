@@ -57,6 +57,7 @@ mainui::MainUI::MainUI() {
 
   this->mainLayout = new QHBoxLayout();
   this->submissionsLayout = new QHBoxLayout();
+  this->bodyLayout = new QVBoxLayout();
 
   this->switchSub("frontpage");
 
@@ -68,6 +69,7 @@ mainui::MainUI::MainUI() {
   this->subredditWidget->setMaximumHeight(120);
   this->subListWidget->setStyleSheet("background-color: #232629; border: 0px;");
 
+  // Widgets under this->topBarWidget
   this->subListWidget->setLayout(this->subListLayout);
   this->subListWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   this->toolBarWidget->setStyleSheet("background-color: #31363b;");
@@ -90,6 +92,9 @@ mainui::MainUI::MainUI() {
   this->titleWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
   this->topBarInfoLayout->setAlignment(Qt::AlignBottom | Qt::AlignLeft);
   this->titleWidget->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+
+  // Widgets under this->bodyWidget
+  this->bodyWidget->setLayout(this->bodyLayout);
 
   this->mainLayout->setMargin(0);
   this->mainLayout->setSpacing(0);
@@ -212,6 +217,27 @@ void mainui::MainUI::toggleSideBar(mainui::SidebarButton type = mainui::SidebarB
 }
 
 void mainui::MainUI::switchSub(std::string sub) {
+  CURL *curl;
+  FILE *fp;
+  CURLcode res;
+  char buffer[CURL_ERROR_SIZE];
+  std::string url_prev = std::string(this->json_about["data"]["icon_img"]);
+  char outfilename[FILENAME_MAX] = "/opt/angel-reddit/temp/.subimg.png";
+  curl = curl_easy_init();
+  if (curl) {
+      fp = fopen(outfilename,"wb");
+      curl_easy_setopt(curl, CURLOPT_URL, url_prev.c_str());
+      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
+      curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+      curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, buffer);
+      res = curl_easy_perform(curl);
+      std::cout << res << std::endl;
+      /* always cleanup */
+      curl_easy_cleanup(curl);
+      fclose(fp);
+      std::cout << buffer << std::endl;
+  }
+
 
   if(this->toolBarWidget->maximumWidth() > 60 && this->subScroll->minimumWidth() < 440) {
     this->toggleSideBar();
@@ -238,6 +264,7 @@ void mainui::MainUI::switchSub(std::string sub) {
     this->subredditWidget->setSubscribers(1);
     this->subredditWidget->setOnlineSubscribers(1);
   };
+  this->subredditWidget->setIcon(QPixmap("/opt/angel-reddit/.subimg.png"));
   cpr::Response frontpage_response = cpr::Get(frontpage_url, this->headers);
   this->json_response = nlohmann::json::parse(response.text);
   auto json_frontpage = nlohmann::json::parse(frontpage_response.text);
@@ -275,55 +302,61 @@ void mainui::MainUI::switchSub(std::string sub) {
       i,
       submissionwidget::Text
     );
-
+    std::cout << i << std::endl;
     temp_widget->setMinimumWidth(100);
 
     submission_widget_list.push_back(temp_widget);
     subListLayout->addWidget(temp_widget);
   }
   std::cout << this->json_about["data"]["icon_img"] << std::endl;
-  std::cout << this->json_about.dump() << std::endl;
   std::cout << std::string(this->json_about["data"]["icon_img"]).c_str() << std::endl;
   this->view(1);
+
+  for(int i = 0; i < submission_widget_list.size(); i++) {
+    std::cout << "[DBG] Submission ID: " << submission_widget_list[i]->index << std::endl;;
+    QObject::connect(submission_widget_list[i], &QPushButton::clicked, [=](){this->view(submission_widget_list[i]->index);});
+  };
 }
 
 void mainui::MainUI::view(int id) {
+  QLayoutItem *child;
+  while ((child = this->bodyLayout->takeAt(0)) != nullptr) {
+      delete child->widget();
+      delete child;
+  };
+
   nlohmann::json temp_json = this->submission_json_list[id];
-  this->titleWidget->setText(QString(std::string(temp_json["data"]["title"]).c_str()));
   this->titleWidget->setStyleSheet("font-weight: bold; font-size: 40px; padding: 8px 3px;");
   signed int score = int(temp_json["data"]["ups"]) - int(temp_json["data"]["downs"]);
   this->topBarInfoWidget->setStyleSheet("padding: 8px 3px;");
   this->upvoteInfoWidget->setText(QString(std::to_string(score).c_str()));
   this->upvoteInfoWidget->setStyleSheet("color: #ff4500; font-weight: bold;");
   std::string author = "u/";
+  std::string title = temp_json["data"]["title"];
   author += std::string(temp_json["data"]["author"]);
+  std::string selftext = std::string(temp_json["data"]["selftext"]);
+  if(selftext == "") {
+    selftext = "Image or link post";
+  }
+  if(title.length() > 35) {
+    title = title.substr(0, 35) + "...";
+  }
+  this->titleWidget->setText(QString(title.c_str()));
+  std::cout << "[DBG] SelfText: " << selftext << std::endl;
+  const QString selftextQstring(selftext.c_str());
   this->authorInfoWidget->setText(QString(author.c_str()));
   this->authorInfoWidget->setStyleSheet("color: #0dd3bb;");
   this->subredditInfoWidget->setStyleSheet("font-weight: bold; font-size: 30px;");
   cpr::Url icon_url(std::string(this->json_about["data"]["icon_img"]));
   cpr::Header headers = this->headers;
-  CURL *curl;
-  FILE *fp;
-  CURLcode res;
-  char buffer[CURL_ERROR_SIZE];
-  std::string url_prev = std::string(this->json_about["data"]["icon_img"]);
-  char outfilename[FILENAME_MAX] = "/opt/angel-reddit/temp/.subimg.png";
-  curl = curl_easy_init();
-  if (curl) {
-      fp = fopen(outfilename,"wb");
-      curl_easy_setopt(curl, CURLOPT_URL, url_prev.c_str());
-      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
-      curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-      curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, buffer);
-      res = curl_easy_perform(curl);
-      std::cout << res << std::endl;
-      /* always cleanup */
-      curl_easy_cleanup(curl);
-      fclose(fp);
-      std::cout << buffer << std::endl;
-  }
+
+  std::cout << temp_json.dump() << std::endl;
   this->subredditIconWidget->setPixmap(QPixmap("/opt/angel-reddit/temp/.subimg.png").scaled(30, 30));
   this->subredditInfoWidget->setText(QString(std::string(this->json_about["data"]["display_name"]).c_str()));
+  QLabel *selfTextLabel = new QLabel(selftextQstring);
+  selfTextLabel->setWordWrap(true);
+  selfTextLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  this->bodyLayout->addWidget(selfTextLabel);
 }
 
 size_t mainui::MainUI::writeBinaryData(void *ptr, size_t size, size_t nmemb, FILE *stream) {

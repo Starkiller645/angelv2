@@ -15,6 +15,7 @@ submissionwidget::SubmissionWidget::SubmissionWidget(std::string title,
                                                      submissionwidget::submission_type type) {
 
   this->submission_widget = new QWidget();
+  this->index = id;
   this->info_widget = new QWidget();
 
   this->main_layout = new QHBoxLayout();
