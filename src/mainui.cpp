@@ -217,11 +217,29 @@ void mainui::MainUI::toggleSideBar(mainui::SidebarButton type = mainui::SidebarB
 }
 
 void mainui::MainUI::switchSub(std::string sub) {
+  if(this->toolBarWidget->maximumWidth() > 60 && this->subScroll->minimumWidth() < 440) {
+    this->toggleSideBar();
+  };
+  std::cout << "Switching to Frontpage" << std::endl;
+  this->subredditWidget->setName(sub);
+  QThreadPool *threadpool = new QThreadPool();
+  std::string filename = std::string(std::getenv("HOME")) + std::string("/.config/angel.json");
+  filejson::JsonRead *json = new filejson::JsonRead(filename);
+  this->jsondata = json->runSynced();
+  cpr::Url frontpage_url{"https://oauth.reddit.com"};
+  cpr::Url url{"https://oauth.reddit.com/r/" + sub + "/hot"};
+  cpr::Url about_url{"https://oauth.reddit.com/r/" + sub + "/about"};
+  std::string authparam = jsondata["access_token"];
+  authparam = "bearer " + authparam;
+  this->headers = cpr::Header{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
+  cpr::Response response = cpr::Get(url, this->headers);
+  cpr::Response about_sub = cpr::Get(about_url, this->headers);
+  this->json_about = nlohmann::json::parse(about_sub.text);
+  std::string url_prev = std::string(this->json_about["data"]["icon_img"]);
   CURL *curl;
   FILE *fp;
   CURLcode res;
   char buffer[CURL_ERROR_SIZE];
-  std::string url_prev = std::string(this->json_about["data"]["icon_img"]);
   char outfilename[FILENAME_MAX] = "/opt/angel-reddit/temp/.subimg.png";
   curl = curl_easy_init();
   if (curl) {
@@ -237,26 +255,6 @@ void mainui::MainUI::switchSub(std::string sub) {
       fclose(fp);
       std::cout << buffer << std::endl;
   }
-
-
-  if(this->toolBarWidget->maximumWidth() > 60 && this->subScroll->minimumWidth() < 440) {
-    this->toggleSideBar();
-  };
-
-  this->subredditWidget->setName(sub);
-  QThreadPool *threadpool = new QThreadPool();
-  std::string filename = "/home/jacob/.config/angel.json";
-  filejson::JsonRead *json = new filejson::JsonRead(filename);
-  this->jsondata = json->runSynced();
-  cpr::Url frontpage_url{"https://oauth.reddit.com"};
-  cpr::Url url{"https://oauth.reddit.com/r/" + sub + "/hot"};
-  cpr::Url about_url{"https://oauth.reddit.com/r/" + sub + "/about"};
-  std::string authparam = jsondata["access_token"];
-  authparam = "bearer " + authparam;
-  this->headers = cpr::Header{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
-  cpr::Response response = cpr::Get(url, this->headers);
-  cpr::Response about_sub = cpr::Get(about_url, this->headers);
-  this->json_about = nlohmann::json::parse(about_sub.text);
   if(sub != "frontpage") {
     this->subredditWidget->setSubscribers(json_about["data"]["subscribers"]);
     this->subredditWidget->setOnlineSubscribers(json_about["data"]["active_user_count"]);
@@ -330,7 +328,11 @@ void mainui::MainUI::view(int id) {
   signed int score = int(temp_json["data"]["ups"]) - int(temp_json["data"]["downs"]);
   this->topBarInfoWidget->setStyleSheet("padding: 8px 3px;");
   this->upvoteInfoWidget->setText(QString(std::to_string(score).c_str()));
-  this->upvoteInfoWidget->setStyleSheet("color: #ff4500; font-weight: bold;");
+  if(std::getenv("OS") == "OSX") {
+    this->upvoteInfoWidget->setStyleSheet("color: #ff4500; font-weight: bold; padding: 0px;");
+  } else {
+    this->upvoteInfoWidget->setStyleSheet("color: #ff4500; font-weight: bold;");
+  }
   std::string author = "u/";
   std::string title = temp_json["data"]["title"];
   author += std::string(temp_json["data"]["author"]);
