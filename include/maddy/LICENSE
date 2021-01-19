@@ -1,0 +1,12 @@
+--2021-01-16 08:39:29--  https://raw.githubusercontent.com/progsource/maddy/master/LICENSE
+Loaded CA certificate '/etc/ssl/certs/ca-certificates.crt'
+Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 151.101.60.133
+Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|151.101.60.133|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 1075 (1.0K) [text/plain]
+Saving to: ‘LICENSE’
+
+     0K .                                                     100% 49.1M=0s
+
+2021-01-16 08:39:30 (49.1 MB/s) - ‘LICENSE’ saved [1075/1075]
+

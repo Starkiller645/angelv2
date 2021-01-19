@@ -3,6 +3,7 @@
 #include "transparentbutton.h"
 #include "filejson.h"
 #include "mainui.h"
+#include <waitingspinnerwidget.h>
 
 #include <QLabel>
 #include <QObject>
@@ -28,50 +29,72 @@ using json = nlohmann::json;
 using namespace mainwindow;
 
 MainWindow::MainWindow() {
-  this->authsite = new QWebEngineView;
+  this->authsite = new QWebEngineView();
   QLabel *label = new QLabel("<b>angel</b>v1.0");
   QLabel *angelLogo = new QLabel();
-  QVBoxLayout *loginLayout = new QVBoxLayout();
-  QPushButton *signinReddit = new QPushButton();
-  QPushButton *browse = new QPushButton("Browse without login");
+  this->loginLayout = new QVBoxLayout();
   this->mainWidget = new QWidget();
   QPixmap angelPixmap(":/images/angel.png");
-  const QIcon redditIcon(":/images/reddit.png");
 
   const QPixmap angelPixmapScaled = angelPixmap.scaled(300, 300, Qt::KeepAspectRatio);
   angelLogo->setPixmap(angelPixmapScaled);
-  signinReddit->setIconSize(QSize(300,85));
-  signinReddit->setFixedSize(redditIcon.actualSize(redditIcon.availableSizes().first()));
-  signinReddit->setIcon(redditIcon);
-  signinReddit->setStyleSheet("border-radius: 3px;");
-  this->mainWidget->setLayout(loginLayout);
-  loginLayout->addWidget(angelLogo);
-  loginLayout->addWidget(label);
-  browse->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
-  loginLayout->addWidget(signinReddit);
-  loginLayout->addWidget(browse);
+  this->mainWidget->setLayout(this->loginLayout);
+  this->loginLayout->addWidget(angelLogo);
+  this->loginLayout->addWidget(label);
   label->setStyleSheet("font-size: 60px;");
-  loginLayout->setAlignment(Qt::AlignCenter);
-  loginLayout->setAlignment(label, Qt::AlignHCenter);
-  loginLayout->setAlignment(browse, Qt::AlignHCenter);
-  QObject::connect(signinReddit, &QPushButton::clicked,
-	  this, &MainWindow::runConnect);
-  QObject::connect(browse, &QPushButton::clicked, this, &MainWindow::doSetupMainUI);
+  this->loginLayout->setAlignment(Qt::AlignCenter);
   setCentralWidget(mainWidget);
+  resize(1080, 640);
   show();
   setWindowTitle("Angel v1 beta 1");
-  resize(1080, 640);
+  QWidget *statusWidget = new QWidget();
+  QHBoxLayout *statusLayout = new QHBoxLayout();
+  this->spinner = new WaitingSpinnerWidget();
+  statusWidget->setLayout(statusLayout);
+  statusLayout->addWidget(spinner);
+  this->checkCredentials();
+  this->loginLayout->addWidget(statusWidget);
+  statusLayout->setAlignment(Qt::AlignCenter);
+  this->spinner->setStyleSheet("padding: 4px;");
+  this->spinner->start();
 }
-void MainWindow::runConnect(){
+void MainWindow::runConnect() {
   QThreadPool *threadpool = new QThreadPool();
   authworker::AuthorisationWorker *receive = new authworker::AuthorisationWorker();
   this->authsite->setWindowTitle("Authenticate with Reddit");
   this->authsite->load(QUrl("https://www.reddit.com/api/v1/authorize.compact?client_id=Jq0BiuUeIrsr3A&response_type=code&state=JDOfne0oPnf&redirect_uri=http://localhost:8800&duration=permanent&scope=identity+read"));
   threadpool->start(receive);
   this->authsite->show();
-  connect(receive, &authworker::AuthorisationWorker::onResponseReceived, this, &MainWindow::onResponseReceived);
-  /*receiveThread->finished.connect(initUI);*/
-  /*receiveThread->started.connect(receive.receiveRedditConnection)*/
+  QObject::connect(receive, &authworker::AuthorisationWorker::onResponseReceived, this, &MainWindow::onResponseReceived);
+}
+
+void MainWindow::doSetupLoginUI() {
+  this->spinner->deleteLater();
+  QPushButton *signinReddit = new QPushButton();
+  QPushButton *browse = new QPushButton("Browse without login");
+  browse->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+  this->loginLayout->addWidget(signinReddit);
+  this->loginLayout->addWidget(browse);
+  signinReddit->setIconSize(QSize(300,85));
+  const QIcon redditIcon(":/images/reddit.png");
+  signinReddit->setFixedSize(redditIcon.actualSize(redditIcon.availableSizes().first()));
+  signinReddit->setIcon(redditIcon);
+  signinReddit->setStyleSheet("border-radius: 3px;");
+  QObject::connect(browse, &QPushButton::clicked, this, &MainWindow::doSetupMainUI);
+  QObject::connect(signinReddit, &QPushButton::clicked,
+	  this, &MainWindow::runConnect);
+  this->loginLayout->setAlignment(browse, Qt::AlignHCenter);
+}
+
+void MainWindow::checkCredentials() {
+  QThread *credentialThread = new QThread();
+  authworker::AuthorisationWorker *credworker = new authworker::AuthorisationWorker();
+  credentialThread->setObjectName("Credential Check Thread");
+  QObject::connect(credentialThread, &QThread::started, credworker, &authworker::AuthorisationWorker::checkCredentials);
+  QObject::connect(credworker, &authworker::AuthorisationWorker::credCheckFailed, this, [=](){this->doSetupLoginUI();});
+  QObject::connect(credworker, &authworker::AuthorisationWorker::credCheckSucceeded, this, [=](){this->doSetupMainUI();});
+  credworker->moveToThread(credentialThread);
+  credentialThread->start();
 }
 
 void MainWindow::onResponseReceived(QString request_qstr) {
@@ -103,7 +126,7 @@ void MainWindow::onResponseReceived(QString request_qstr) {
   std::string get_uname_string = get_credentials_json["subreddit"]["display_name"];
   get_uname_string = get_uname_string.substr(2);
 
-  json cred_json;
+  nlohmann::json cred_json;
   cred_json["client_id"] = "Jq0BiuUeIrsr3A";
   cred_json["user_agent"] = "angel/v1.0 (by /u/Starkiller645)";
   cred_json["refresh_token"] = this->refresh_token;
@@ -116,7 +139,7 @@ void MainWindow::onResponseReceived(QString request_qstr) {
   write_json->run();
 
   filejson::JsonRead *read_json = new filejson::JsonRead(filename);
-  QObject::connect(read_json, &filejson::JsonRead::onJsonRead, this, [=](json json_read){this->conf_json = json_read;});
+  QObject::connect(read_json, &filejson::JsonRead::onJsonRead, this, [=](nlohmann::json json_read){this->conf_json = json_read;});
   read_json->run();
   std::cout << "OAuth 2 access token: " << this->conf_json["access_token"] << std::endl << "OAuth 2 refresh token: " << this->conf_json["refresh_token"] << std::endl;
 
@@ -157,16 +180,16 @@ void MainWindow::onResponseReceived(QString request_qstr) {
   QTimer *timer_animation = new QTimer(this);
   timer_animation->setSingleShot(true);
   connect(timer_animation, &QTimer::timeout, this, [=]() {move_up_anim->start();});
-  timer_animation->start(800);
+  //timer_animation->start(800);
   next_button->doAnimation();
 
+  this->mainLayout->deleteLater();
   this->mainLayout = new QVBoxLayout;
   this->mainLayout->addWidget(labels_container);
   this->mainLayout->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
   this->mainWidget->setLayout(this->mainLayout);
   setCentralWidget(this->mainWidget);
-
-  connect(next_button, &QPushButton::clicked, this, &MainWindow::doSetupMainUI);
+  QObject::connect(next_button, &QPushButton::clicked, this, &MainWindow::doSetupMainUI);
 }
 
 void MainWindow::doSetupMainUI() {

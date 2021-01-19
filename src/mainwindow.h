@@ -7,6 +7,7 @@
 #include <QMainWindow>
 #include <QtWebEngineWidgets>
 #include <nlohmann/json.hpp>
+#include <waitingspinnerwidget.h>
 
 using namespace Qt;
 
@@ -17,11 +18,15 @@ namespace mainwindow {
     void runConnect();
     QWebEngineView *authsite;
     QWidget *mainWidget;
+    QVBoxLayout *loginLayout;
+    WaitingSpinnerWidget *spinner;
     mainui::MainUI *ui;
   public slots:
     void doSetupMainUI();
+    void doSetupLoginUI();
     void onResponseReceived(QString);
   private:
+    void checkCredentials();
     std::string bearer_token;
     std::string refresh_token;
     QVBoxLayout *mainLayout;

@@ -1,4 +1,5 @@
 #include "authworker.h"
+#include "filejson.h"
 #include <QtWebSockets/QWebSocketServer>
 #include <QtWebSockets/QWebSocket>
 #include <QTcpServer>
@@ -14,6 +15,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <cpr/cpr.h>
 #include <cstdlib>
 #include <sstream>
 
@@ -29,7 +31,8 @@ int n;
 std::string httpsend;
 
 
-AuthorisationWorker::AuthorisationWorker() {
+AuthorisationWorker::AuthorisationWorker(std::string sub) {
+  this->sub = sub;
   return;
 }
 
@@ -76,6 +79,75 @@ void AuthorisationWorker::capture_signal() {
 void AuthorisationWorker::onEchoReceived(QString message) {
   std::cout << "Text message incoming!" << std::endl;
   qDebug() << "Message received:" << message;
+}
+
+void AuthorisationWorker::checkCredentials() {
+  std::string filename = std::string(std::getenv("HOME")) + std::string("/.config/angel.json");
+  this->json = new filejson::JsonRead(filename);
+  nlohmann::json jsondata = json->runSynced();
+  std::cout << jsondata.dump() << std::endl;
+  cpr::Url frontpage_url{"https://oauth.reddit.com"};
+  std::string authparam = jsondata["access_token"];
+  authparam = "bearer " + authparam;
+  cpr::Header headers{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
+  cpr::Response response = cpr::Get(frontpage_url, headers);
+  bool exceptionCaught = true;
+  try {
+    std::cout << "[DBG] Attempting to parse response..." << std::endl;
+    nlohmann::json json_about = nlohmann::json::parse(response.text);
+    std::cout << "[DBG] Done!" << std::endl;
+    exceptionCaught = false;
+  } catch(nlohmann::detail::parse_error) {
+    emit AuthorisationWorker::credCheckFailed();
+  } if(!exceptionCaught) {
+    emit AuthorisationWorker::credCheckSucceeded();
+  }
+}
+
+void AuthorisationWorker::switchSub () {
+  std::string filename = std::string(std::getenv("HOME")) + std::string("/.config/angel.json");
+  cpr::Url frontpage_url{"https://oauth.reddit.com"};
+  cpr::Url url{"https://oauth.reddit.com/r/" + this->sub + "/hot"};
+  cpr::Url about_url{"https://oauth.reddit.com/r/" + this->sub + "/about"};
+  filejson::JsonRead *json = new filejson::JsonRead(filename);
+  nlohmann::json jsondata = json->runSynced();
+  std::string authparam = jsondata["access_token"];
+  authparam = "bearer " + authparam;
+  cpr::Header headers{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
+  cpr::Response response = cpr::Get(url, headers);
+  cpr::Response about_sub = cpr::Get(about_url, headers);
+  cpr::Response frontpage_response = cpr::Get(frontpage_url, headers);
+  nlohmann::json json_about = nlohmann::json::parse(about_sub.text);
+  nlohmann::json json_response = nlohmann::json::parse(response.text);
+  nlohmann::json json_frontpage = nlohmann::json::parse(frontpage_response.text);
+  emit AuthorisationWorker::onSwitchSubComplete(sub, json_response, json_about, json_frontpage);
+}
+
+void AuthorisationWorker::downloadImageFile(std::string url) {
+  std::string fileExtension = url.substr(url.rfind("."));
+  std::string filename = "/opt/angel-reddit/temp/.img." + fileExtension;
+  std::cout << filename << std::endl;
+  CURL *curl;
+  FILE *fp;
+  CURLcode res;
+  char buffer[CURL_ERROR_SIZE];
+  char outfilename[FILENAME_MAX];
+  strcpy(outfilename, filename.c_str());
+  curl = curl_easy_init();
+  if (curl) {
+      fp = fopen(outfilename,"wb");
+      curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
+      curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+      curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, buffer);
+      res = curl_easy_perform(curl);
+      std::cout << res << std::endl;
+      /* always cleanup */
+      curl_easy_cleanup(curl);
+      fclose(fp);
+  }
+  emit AuthorisationWorker::onDownloadImageFile(filename);
+  return;
 }
 
 void AuthorisationWorker::ready_Read() {
