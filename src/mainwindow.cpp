@@ -49,6 +49,7 @@ MainWindow::MainWindow() {
   setCentralWidget(mainWidget);
   resize(1080, 640);
   show();
+  this->mainWidget->setStyleSheet("background-color: #eff0f1; color: #232629;");
   setWindowTitle("Angel v1 beta 1");
   QWidget *statusWidget = new QWidget();
   QHBoxLayout *statusLayout = new QHBoxLayout();

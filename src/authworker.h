@@ -20,9 +20,7 @@ namespace authworker {
       AuthorisationWorker(std::string sub = "frontpage");
       void run() override;
     public slots:
-      void capture_signal();
       void ready_Read();
-      void onEchoReceived(QString);
       void checkCredentials();
       void switchSub();
       void downloadImageFile(std::string);

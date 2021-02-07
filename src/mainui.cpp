@@ -280,21 +280,20 @@ void mainui::MainUI::onSearchTextUpdate() {
 }
 
 void mainui::MainUI::doGetSearchSubs() {
-  std::cout << "[DBG] Getting sub search list from Reddit" << std::endl;
-  std::string query = this->searchTextEdit->text().toStdString();
-  std::string bearer_auth = "bearer ";
-  bearer_auth += this->bearer_token.c_str();
-  std::cout << bearer_auth << std::endl;
-  std::string query_url = "https://oauth.reddit.com/subreddits/search.json";
-  query_url += "?q=";
-  query_url += query;
-  redasync::AsyncRequest *request = new redasync::AsyncRequest(redasync::request_type::GetRequest, cpr::Url{query_url.c_str()}, cpr::Header{{"Authorization", bearer_auth.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"q", query.c_str()}});
-  QThread *thread = new QThread();
-  request->moveToThread(thread);
-  thread->start();
-  QObject::connect(thread, &QThread::started, request, &redasync::AsyncRequest::run);
-  QObject::connect(request, &redasync::AsyncRequest::request_received_json, this, &mainui::MainUI::updateSubList);
-
+  if(this->searchTextEdit->text().toStdString() != "") {
+    std::string query = this->searchTextEdit->text().toStdString();
+    std::string bearer_auth = "bearer ";
+    bearer_auth += this->bearer_token.c_str();
+    std::string query_url = "https://oauth.reddit.com/subreddits/search.json";
+    query_url += "?q=";
+    query_url += query;
+    redasync::AsyncRequest *request = new redasync::AsyncRequest(redasync::request_type::GetRequest, cpr::Url{query_url.c_str()}, cpr::Header{{"Authorization", bearer_auth.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"q", query.c_str()}});
+    QThread *thread = new QThread();
+    request->moveToThread(thread);
+    thread->start();
+    QObject::connect(thread, &QThread::started, request, &redasync::AsyncRequest::run);
+    QObject::connect(request, &redasync::AsyncRequest::request_received_json, this, &mainui::MainUI::updateSubList);
+  };
 }
 
 void mainui::MainUI::updateSubList(nlohmann::json jsondata) {
@@ -304,14 +303,12 @@ void mainui::MainUI::updateSubList(nlohmann::json jsondata) {
       delete child;
   };
   nlohmann::json subs_list = jsondata["data"]["children"];
-  std::cout << "updating sub list..." << std::endl;
   std::vector<subredditwidget::SmallFormWidget *> subwidgetvector;
   QVBoxLayout *subredditLayout = new QVBoxLayout();
   QWidget *subredditWidget = new QWidget();
   subredditWidget->setObjectName("SUBREDDITWIDGET");
   subredditLayout->setObjectName("SUBREDDITLAYOUT");
   for(int i = 0; i < 5 && i < int(subs_list.size()); i++) {
-    std::cout << subs_list[i]["data"]["display_name"] << std::endl;
     subredditwidget::SmallFormWidget *temp_widget = new subredditwidget::SmallFormWidget(std::string(subs_list[i]["data"]["display_name"]));
     temp_widget->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     QObject::connect(temp_widget, &QPushButton::clicked, [=](){this->switchSub(subs_list[i]["data"]["display_name"]);});
@@ -329,7 +326,6 @@ void mainui::MainUI::switchSub(std::string sub) {
     this->toggleSideBar();
   }
   this->subredditWidget->startSpinner();
-  std::cout << "Switching to " << sub << std::endl;
   this->subredditWidget->setName(sub);
   QThread *switchSubThread = new QThread();
   std::string filename = std::string(std::getenv("HOME")) + std::string("/.config/angel.json");
@@ -339,7 +335,6 @@ void mainui::MainUI::switchSub(std::string sub) {
   QObject::connect(switchSubThread, &QThread::started, switchSubWorker, &authworker::AuthorisationWorker::switchSub);
   QObject::connect(switchSubWorker, &authworker::AuthorisationWorker::onSwitchSubComplete, this, &mainui::MainUI::onSwitchSubComplete);
   switchSubWorker->moveToThread(switchSubThread);
-  std::cout << "[DBG] Starting switchSubThread" << std::endl;
   switchSubThread->start();
 }
 
@@ -357,9 +352,6 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
     this->json_response = response_json;
     this->json_frontpage = frontpage_json;
     this->json_about = json_about;
-    std::cout << url_prev << std::endl;
-    std::cout << "Parsing response"  << std::endl;
-    std::cout << "First post: " << this->json_response["data"]["children"][0]["data"]["title"] << std::endl;
 
   std::vector<submissionwidget::SubmissionWidget *> submission_widget_list;
 
@@ -386,21 +378,15 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
     int downs = this->submission_json_list[i]["data"]["downs"];
     signed int score = ups - downs;
     submissionwidget::submission_type subType;
-    std::cout << submission_json_list[i] << std::endl;
     std::string url = submission_json_list[i]["data"]["url"];
-    std::cout << url << std::endl;
     if(url.find("i.redd.it") != std::string::npos || url.find("i.imgur.com") != std::string::npos || url.find("i.reddit.com") != std::string::npos) {
       subType = submissionwidget::Image;
-      std::cout << "Type is Image" << std::endl;
     } else if(url.find("v.redd.it") != std::string::npos) {
       subType = submissionwidget::Video;
-      std::cout << "Type is Video" << std::endl;
     } else if(url.find("reddit.com/r/") != std::string::npos) {
       subType = submissionwidget::Text;
-      std::cout << "Type is Text" << std::endl;
     } else {
       subType = submissionwidget::Link;
-      std::cout << "Type is Link" << std::endl;
     }
 
     submissionwidget::SubmissionWidget *temp_widget = new submissionwidget::SubmissionWidget(
@@ -411,19 +397,15 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
       i,
       subType
     );
-    std::cout << i << std::endl;
     temp_widget->setMinimumWidth(100);
 
     submission_widget_list.push_back(temp_widget);
     subListLayout->addWidget(temp_widget);
   }
   this->subredditWidget->stopSpinner();
-  std::cout << this->json_about["data"]["icon_img"] << std::endl;
-  std::cout << std::string(this->json_about["data"]["icon_img"]).c_str() << std::endl;
   this->view(1);
 
   for(int i = 0; i < submission_widget_list.size(); i++) {
-    std::cout << "[DBG] Submission ID: "  << submission_widget_list[i]->index << std::endl;
     QObject::connect(submission_widget_list[i], &QPushButton::clicked, [=](){this->view(submission_widget_list[i]->index);});
   };
 }
@@ -461,8 +443,6 @@ void mainui::MainUI::view(int id) {
   selftext = htmlOutput;
   std::string url = temp_json["data"]["url"];
 
-  std::cout << url << std::endl;
-
   if(url.find("i.redd.it") != std::string::npos || url.find("i.imgur.com") != std::string::npos || url.find("i.reddit.com") != std::string::npos) {
     subType = submissionwidget::Image;
   } else if(url.find("v.reddit.com") != std::string::npos) {
@@ -475,7 +455,6 @@ void mainui::MainUI::view(int id) {
 
   if(subType == submissionwidget::Image || subType == submissionwidget::Video) {
     this->bodyLayout->setAlignment(Qt::AlignCenter);
-    std::cout << "[DBG] Starting image-dl thread" << std::endl;
     this->imageThread->quit();
     this->imageThread->deleteLater();
     this->imageThread = new QThread();
@@ -512,8 +491,6 @@ void mainui::MainUI::view(int id) {
   size_t pos = selftext.find(replacement_img_tag);
   int i = 0;
 
-  std::cout << "Starting vector sort" << std::endl;
-  std::cout << "Position: " << pos << " Size: " << selftextVector.size() << std::endl;
   while(pos < selftext.length()) {
     pos = selftext.find(replacement_img_tag);
     if(i == 0) {
@@ -521,15 +498,8 @@ void mainui::MainUI::view(int id) {
     } else {
       selftextVector[i - 1] = selftextVector[i - 1].substr(0, pos);
     }
-    std::cout << i << std::endl;
     selftextVector[i] = selftextVector[i - 1].substr(pos);
     i++;
-  }
-
-  std::cout << "Iterating through vector" << std::endl;
-
-  for(int i = 0; i < selftextVector.size(); i++) {
-    std::cout << "Vector position [" << i << "]: " << selftextVector[i] << std::endl;
   }
 
   this->subredditIconWidget->setPixmap(QPixmap("/opt/angel-reddit/temp/.subimg.png").scaled(30, 30));
@@ -591,7 +561,6 @@ void mainui::MainUI::onResponseReceived(QString request_qstr) {
   filejson::JsonRead *read_json = new filejson::JsonRead(filename);
   QObject::connect(read_json, &filejson::JsonRead::onJsonRead, this, [=](nlohmann::json json_read){this->conf_json = json_read;});
   read_json->run();
-  std::cout << "OAuth 2 access token: " << this->conf_json["access_token"]<< std::endl  << "OAuth 2 refresh token: "  << this->conf_json["refresh_token"] << std::endl;
   this->switchSub("frontpage");
 }
 
@@ -610,7 +579,6 @@ void mainui::MainUI::onResponseReceived(QString request_qstr) {
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
         curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, buffer);
         res = curl_easy_perform(curl);
-        std::cout << res << std::endl;
         /* always cleanup */
         curl_easy_cleanup(curl);
         fclose(fp);

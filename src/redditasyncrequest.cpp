@@ -26,22 +26,18 @@ redasync::AsyncRequest::AsyncRequest(redasync::request_type requestType, cpr::Ur
 };
 
 void AsyncRequest::run() {
-  std::cout << "[DBG] Getting request" << std::endl;
   std::ofstream stream;
 
   switch(this->requestType) {
     case redasync::request_type::PostRequest:
       this->postRequest = cpr::Post(this->endpointUri, this->requestHeaders);
       this->jsonResponse = nlohmann::json::parse(this->postRequest.text);
-      std::cout << this->jsonResponse.dump() << std::endl;
       stream.close();
       emit request_received_json(this->jsonResponse);
       break;
     case redasync::request_type::GetRequest:
       this->getRequest = cpr::Get(this->endpointUri, this->requestHeaders, this->getParams);
-      std::cout << this->getRequest.text;
       this->jsonResponse = nlohmann::json::parse(this->getRequest.text);
-      std::cout << this->jsonResponse.dump() << std::endl;
       stream.open("example_subsearch.json");
       stream << jsonResponse.dump();
       stream.close();

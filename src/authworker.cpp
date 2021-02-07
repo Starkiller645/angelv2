@@ -37,12 +37,6 @@ AuthorisationWorker::AuthorisationWorker(std::string sub) {
 
 void AuthorisationWorker::run() {
   std::ostringstream httpsend_stream;
-
-  /*if(QObject::connect(&sock_server, &QTcpServer::newConnection, this, &AuthorisationWorker::capture_signal)) {
-    () std::cout << "Connect to capture_signal succeeded\n";
-  };
-  if(sock_server.listen(QHostAddress::Any, 8080)) {
-    () std::cout << "Reddit Authorisation Worker listening on port 8080" std::cout << std::endl;*/
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   bzero((char *) &serv_addr, sizeof(serv_addr));
   portno = 8800;
@@ -71,19 +65,10 @@ void AuthorisationWorker::run() {
   emit AuthorisationWorker::onResponseReceived(QString(buffer));
 };
 
-void AuthorisationWorker::capture_signal() {
-  /*QObject::connect(connection, &QTcpSocket::textMessageReceived, this, &AuthorisationWorker::onEchoReceived);*/
-}
-
-void AuthorisationWorker::onEchoReceived(QString message) {
-  std::cout << "Text message incoming!" << std::endl;
-}
-
 void AuthorisationWorker::checkCredentials() {
   std::string filename = std::string(std::getenv("HOME")) + std::string("/.config/angel.json");
   this->json = new filejson::JsonRead(filename);
   nlohmann::json jsondata = json->runSynced();
-  std::cout << jsondata.dump() << std::endl;
   cpr::Url frontpage_url{"https://oauth.reddit.com"};
   std::string authparam = jsondata["access_token"];
   authparam = "bearer " + authparam;
@@ -91,16 +76,12 @@ void AuthorisationWorker::checkCredentials() {
   cpr::Response response = cpr::Get(frontpage_url, headers);
   bool exceptionCaught = true;
   try {
-    std::cout << "[DBG] Attempting to parse response..." << std::endl;
     nlohmann::json json_about = nlohmann::json::parse(response.text);
-    std::cout << "[DBG] Done!"  << std::endl;
     exceptionCaught = false;
   } catch(nlohmann::detail::parse_error) {
     cpr::Header headers = cpr::Header{{"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"Authorization", "Basic SnEwQml1VWVJcnNyM0E6"}};
     cpr::Payload refresh_payload{{"grant_type", "refresh_token"}, {"refresh_token", std::string(jsondata["refresh_token"]).c_str()}};
     cpr::Response refresh_response = cpr::Post(cpr::Url{"https://www.reddit.com/api/v1/access_token"}, headers, refresh_payload);
-    std::cout << "Refresh Token Request Response Code: " << refresh_response.status_code << std::endl;
-    std::cout << refresh_response.text  << std::endl;
     if(refresh_response.status_code >= 400) {
       emit AuthorisationWorker::credCheckFailed();
     }

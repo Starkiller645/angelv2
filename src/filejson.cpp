@@ -43,13 +43,9 @@ void filejson::JsonRead::run() {
 nlohmann::json filejson::JsonRead::runSynced() {
   std::ifstream filestream;
   filestream.open(this->filename);
-  std::cout << filename << std::endl;
   try {
-    std::cout << "[DBG] Trying to get JSON from ~/.config/angel.json..." << std::endl;
     filestream >> this->jobj;
-    std::cout << "[DBG] Done and caught no errors" << std::endl;
   } catch (...) {
-    std::cout << "[DBG] Done and found an error. Writing blank config to ~/.config/angel.json..." << std::endl;
     std::string filename = std::string(std::getenv("HOME")) + std::string("/.config/angel.json");
     std::ofstream fstream;
     fstream.open(filename);
@@ -60,7 +56,6 @@ nlohmann::json filejson::JsonRead::runSynced() {
     char buffer[200];
     infstream.get(buffer, 200);
     std::string cred_string = std::string(buffer);
-    std::cout << buffer << std::endl;
     this->jobj = nlohmann::json::parse(cred_string);
     infstream.close();
   }
