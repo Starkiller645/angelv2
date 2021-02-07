@@ -1,0 +1,3 @@
+[submodule "waitingspinnerwidget"]
+	path = include/QtWaitingSpinner
+	url = https://github.com/snowwlex/QtWaitingSpinner.git
