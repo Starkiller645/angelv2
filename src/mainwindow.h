@@ -29,6 +29,8 @@ namespace mainwindow {
     void checkCredentials();
     std::string bearer_token;
     std::string refresh_token;
+    QPushButton *signinReddit;
+    QPushButton *browse;
     QVBoxLayout *mainLayout;
     nlohmann::json conf_json;
   };

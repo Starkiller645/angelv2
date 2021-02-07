@@ -23,9 +23,12 @@
 #include <curl/curl.h>
 
 mainui::MainUI::MainUI() {
+  // Misc objects setup
+  this->searchTimeoutTimer = new QTimer(this);
+
   //Top level primary widgets
   this->sideBarWidget = new QWidget();
-  this->subredditWidget = new subredditwidget::SubredditWidget;
+  this->subredditWidget = new subredditwidget::SubredditWidget();
   std::string subName = "<b>frontpage</b>";
   this->subredditWidget->setName(subName);
   this->subredditWidget->setOnlineSubscribers(2041);
@@ -65,13 +68,21 @@ mainui::MainUI::MainUI() {
   this->submissionsLayout = new QHBoxLayout();
   this->bodyLayout = new QVBoxLayout();
 
+  searchButton = new QPushButton();
+  QIcon searchButtonIcon(":/images/icon-search.svg");
+  searchButton->setIcon(searchButtonIcon);
+  searchButton->setIconSize(QSize(36, 36));
+  searchButton->setStyleSheet("background-color: rgba(255, 255, 255, 0); border: 0px; padding: 7px;");
+  this->subredditWidget->external_layout->addWidget(searchButton);
+  this->isSidebarOut = false;
+
   this->switchSub("frontpage");
 
   this->subredditWidget->setStyleSheet("background-color: #232629;");
   this->submissionsWidget->setStyleSheet("background-color: #232629; border: 0px;");
-  //this->bodyWidget->setStyleSheet("background-color: #ffffff;");
-  this->topBarWidget->setStyleSheet("background-color: #eff0f1;");
-  this->bottomBarWidget->setStyleSheet("background-color: #eff0f1;");
+  this->bodyWidget->setStyleSheet("background-color: #ffffff; color: #232629;");
+  this->topBarWidget->setStyleSheet("background-color: #eff0f1; color: #232629;");
+  this->bottomBarWidget->setStyleSheet("background-color: #eff0f1; color: #232629;");
   this->subredditWidget->setMaximumHeight(120);
   this->subListWidget->setStyleSheet("background-color: #232629; border: 0px;");
 
@@ -135,13 +146,12 @@ mainui::MainUI::MainUI() {
   this->mainLayout->addWidget(this->displayWidget);
   this->setLayout(this->mainLayout);
 
-  QIcon searchIcon(":/images/icon-search.svg");
-  this->searchButton = new QPushButton();
-  this->searchButton->setIcon(searchIcon);
-  this->searchButton->setIconSize(QSize(36, 36));
-  this->searchButton->setStyleSheet("background-color: rgba(255, 255, 255, 0); border: 0px; padding: 7px;");
   this->toolBarLayout->setAlignment(Qt::AlignCenter | Qt::AlignTop);
-  QObject::connect(this->searchButton, &QPushButton::clicked, this, [=](){this->toggleSideBar(mainui::SidebarButton::Search);});
+  this->subredditWidget->setMinimumWidth(10);
+  this->subredditWidget->main_widget->setMinimumWidth(10);
+  this->subredditWidget->main_widget->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+  QObject::connect(searchButton, &QPushButton::clicked, this, [=](){this->toggleSideBar(mainui::SidebarButton::Search);});
+  QObject::connect(searchButton, &QPushButton::clicked, [=](){searchButton->deleteLater();});
 
   /*QTimer *timer_animation = new QTimer(this);
   timer_animation->setSingleShot(true);
@@ -157,12 +167,20 @@ mainui::MainUI::MainUI() {
 void mainui::MainUI::toggleSideBar(mainui::SidebarButton type = mainui::SidebarButton::Search) {
 
   QLayoutItem *child;
-  while ((child = this->toolBarLayout->takeAt(0)) != nullptr) {
+  while ((child = this->subredditWidget->external_layout->takeAt(0)) != nullptr) {
       delete child->widget();
       delete child;
   };
+  QLayoutItem *child2;
+  while ((child2 = this->toolBarLayout->takeAt(0)) != nullptr) {
+      delete child2->widget();
+      delete child2;
+  };
+  //this->searchButton->deleteLater();
 
-  if(this->toolBarWidget->maximumWidth() > 60 && this->subScroll->minimumWidth() < 440) {
+  if(this->isSidebarOut) {
+    QParallelAnimationGroup *anim_group = new QParallelAnimationGroup();
+
     QPropertyAnimation *toolbar_anim = new QPropertyAnimation(this->toolBarWidget, "maximumWidth");
     toolbar_anim->setStartValue(this->toolBarWidget->maximumWidth());
     toolbar_anim->setEndValue(60);
@@ -173,28 +191,54 @@ void mainui::MainUI::toggleSideBar(mainui::SidebarButton type = mainui::SidebarB
     sublist_anim->setEndValue(440);
     sublist_anim->setDuration(600);
 
-    this->searchButton = new QPushButton();
+    QPropertyAnimation *sub_image_anim = new QPropertyAnimation(this->subredditWidget->sub_image, "minimumWidth");
+    sub_image_anim->setStartValue(this->subredditWidget->sub_image->minimumWidth());
+    sub_image_anim->setEndValue(60);
+    sub_image_anim->setDuration(587);
+
+    QPropertyAnimation *sub_title_anim = new QPropertyAnimation(this->subredditWidget->main_widget, "maximumWidth");
+    sub_title_anim->setStartValue(this->subredditWidget->main_widget->maximumWidth());
+    sub_title_anim->setEndValue(440);
+    sub_title_anim->setDuration(587);
+
+    searchButton = new QPushButton();
     QIcon searchIcon(":/images/icon-search.svg");
-    this->searchButton->setIcon(searchIcon);
-    this->searchButton->setIconSize(QSize(36, 36));
-    this->searchButton->setStyleSheet("background-color: rgba(255, 255, 255, 0); border: 0px; padding: 7px;");
-    this->toolBarLayout->addWidget(this->searchButton);
-    QObject::connect(this->searchButton, &QPushButton::clicked, this, [=](){this->toggleSideBar(mainui::SidebarButton::Search);});
+    searchButton->setIcon(searchIcon);
+    searchButton->setIconSize(QSize(36, 36));
+    searchButton->setStyleSheet("background-color: rgba(255, 255, 255, 0); border: 0px; padding: 7px;");
+    this->subredditWidget->external_layout->addWidget(searchButton);
+    QObject::connect(searchButton, &QPushButton::clicked, this, [=](){this->toggleSideBar(mainui::SidebarButton::Search);});
+    QObject::connect(searchButton, &QPushButton::clicked, this, [=](){searchButton->deleteLater();});
 
-    sublist_anim->start();
-    toolbar_anim->start();
-
+    anim_group->addAnimation(sublist_anim);
+    anim_group->addAnimation(toolbar_anim);
+    anim_group->addAnimation(sub_image_anim);
+    anim_group->addAnimation(sub_title_anim);
+    anim_group->start();
+    this->isSidebarOut = false;
   } else {
+
+    QParallelAnimationGroup *anim_group = new QParallelAnimationGroup();
 
     QPropertyAnimation *toolbar_anim = new QPropertyAnimation(this->toolBarWidget, "maximumWidth");
     toolbar_anim->setStartValue(this->toolBarWidget->maximumWidth());
-    toolbar_anim->setEndValue(500);
+    toolbar_anim->setEndValue(443);
     toolbar_anim->setDuration(600);
 
     QPropertyAnimation *sublist_anim = new QPropertyAnimation(this->subScroll, "minimumWidth");
     sublist_anim->setStartValue(this->subScroll->minimumWidth());
-    sublist_anim->setEndValue(0);
+    sublist_anim->setEndValue(20);
     sublist_anim->setDuration(600);
+
+    QPropertyAnimation *sub_image_anim = new QPropertyAnimation(this->subredditWidget->sub_image, "minimumWidth");
+    sub_image_anim->setStartValue(this->subredditWidget->sub_image->minimumWidth());
+    sub_image_anim->setEndValue(443);
+    sub_image_anim->setDuration(587);
+
+    QPropertyAnimation *sub_title_anim = new QPropertyAnimation(this->subredditWidget->main_widget, "maximumWidth");
+    sub_title_anim->setStartValue(this->subredditWidget->main_widget->maximumWidth());
+    sub_title_anim->setEndValue(20);
+    sub_title_anim->setDuration(587);
 
     switch(type) {
       case mainui::SidebarButton::Search:
@@ -202,6 +246,12 @@ void mainui::MainUI::toggleSideBar(mainui::SidebarButton type = mainui::SidebarB
         QHBoxLayout *searchLayout = new QHBoxLayout();
         QLabel *searchLabel = new QLabel("Search");
         this->searchTextEdit = new QLineEdit();
+        this->searchTimeoutTimer->deleteLater();
+        this->searchTimeoutTimer = new QTimer(this);
+        this->searchTimeoutTimer->setSingleShot(true);
+        QObject::connect(this->searchTimeoutTimer, &QTimer::timeout, this, &mainui::MainUI::doGetSearchSubs);
+        QObject::connect(this->searchTextEdit, &QLineEdit::textEdited, this, &mainui::MainUI::onSearchTextUpdate);
+        this->searchResultsLayout = new QVBoxLayout();
         this->goButton = new QPushButton("Go");
         this->searchTextEdit->setStyleSheet("color: white; background-color: #232629; border: 1px solid #31363b;");
         this->searchTextEdit->setFixedHeight(25);
@@ -211,21 +261,74 @@ void mainui::MainUI::toggleSideBar(mainui::SidebarButton type = mainui::SidebarB
         searchLayout->addWidget(this->searchTextEdit);
         searchLayout->addWidget(this->goButton);
         searchWidget->setLayout(searchLayout);
-        this->toolBarLayout->addWidget(searchLabel);
-        this->toolBarLayout->setAlignment(Qt::AlignRight | Qt::AlignTop);
-        this->toolBarLayout->addWidget(searchWidget);
+        this->subredditWidget->external_layout->addWidget(searchLabel);
+        this->subredditWidget->external_layout->setAlignment(Qt::AlignRight | Qt::AlignTop);
+        this->subredditWidget->external_layout->addWidget(searchWidget);
     };
+    anim_group->addAnimation(sublist_anim);
+    anim_group->addAnimation(toolbar_anim);
+    anim_group->addAnimation(sub_image_anim);
+    anim_group->addAnimation(sub_title_anim);
 
-    sublist_anim->start();
-    toolbar_anim->start();
-
+    anim_group->start();
+    this->isSidebarOut = true;
   }
 }
 
-void mainui::MainUI::switchSub(std::string sub) {
-  if(this->toolBarWidget->maximumWidth() > 60 && this->subScroll->minimumWidth() < 440) {
-    this->toggleSideBar();
+void mainui::MainUI::onSearchTextUpdate() {
+  this->searchTimeoutTimer->start(800);
+}
+
+void mainui::MainUI::doGetSearchSubs() {
+  std::cout << "[DBG] Getting sub search list from Reddit" << std::endl;
+  std::string query = this->searchTextEdit->text().toStdString();
+  std::string bearer_auth = "bearer ";
+  bearer_auth += this->bearer_token.c_str();
+  std::cout << bearer_auth << std::endl;
+  std::string query_url = "https://oauth.reddit.com/subreddits/search.json";
+  query_url += "?q=";
+  query_url += query;
+  redasync::AsyncRequest *request = new redasync::AsyncRequest(redasync::request_type::GetRequest, cpr::Url{query_url.c_str()}, cpr::Header{{"Authorization", bearer_auth.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"q", query.c_str()}});
+  QThread *thread = new QThread();
+  request->moveToThread(thread);
+  thread->start();
+  QObject::connect(thread, &QThread::started, request, &redasync::AsyncRequest::run);
+  QObject::connect(request, &redasync::AsyncRequest::request_received_json, this, &mainui::MainUI::updateSubList);
+
+}
+
+void mainui::MainUI::updateSubList(nlohmann::json jsondata) {
+  QLayoutItem *child;
+  while ((child = this->toolBarLayout->takeAt(0)) != nullptr) {
+      delete child->widget();
+      delete child;
   };
+  nlohmann::json subs_list = jsondata["data"]["children"];
+  std::cout << "updating sub list..." << std::endl;
+  std::vector<subredditwidget::SmallFormWidget *> subwidgetvector;
+  QVBoxLayout *subredditLayout = new QVBoxLayout();
+  QWidget *subredditWidget = new QWidget();
+  subredditWidget->setObjectName("SUBREDDITWIDGET");
+  subredditLayout->setObjectName("SUBREDDITLAYOUT");
+  for(int i = 0; i < 5 && i < int(subs_list.size()); i++) {
+    std::cout << subs_list[i]["data"]["display_name"] << std::endl;
+    subredditwidget::SmallFormWidget *temp_widget = new subredditwidget::SmallFormWidget(std::string(subs_list[i]["data"]["display_name"]));
+    temp_widget->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+    QObject::connect(temp_widget, &QPushButton::clicked, [=](){this->switchSub(subs_list[i]["data"]["display_name"]);});
+    subwidgetvector.push_back(temp_widget);
+    subredditLayout->addWidget(temp_widget);
+  };
+  subredditWidget->setLayout(subredditLayout);
+  this->toolBarLayout->addWidget(subredditWidget);
+  this->toolBarLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  subredditLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+}
+
+void mainui::MainUI::switchSub(std::string sub) {
+  if(this->isSidebarOut) {
+    this->toggleSideBar();
+  }
+  this->subredditWidget->startSpinner();
   std::cout << "Switching to " << sub << std::endl;
   this->subredditWidget->setName(sub);
   QThread *switchSubThread = new QThread();
@@ -233,10 +336,10 @@ void mainui::MainUI::switchSub(std::string sub) {
   filejson::JsonRead *json = new filejson::JsonRead(filename);
   this->jsondata = json->runSynced();
   authworker::AuthorisationWorker *switchSubWorker = new authworker::AuthorisationWorker(sub);
-  switchSubWorker->setObjectName("Switch-Sub Thread Worker");
   QObject::connect(switchSubThread, &QThread::started, switchSubWorker, &authworker::AuthorisationWorker::switchSub);
   QObject::connect(switchSubWorker, &authworker::AuthorisationWorker::onSwitchSubComplete, this, &mainui::MainUI::onSwitchSubComplete);
   switchSubWorker->moveToThread(switchSubThread);
+  std::cout << "[DBG] Starting switchSubThread" << std::endl;
   switchSubThread->start();
 }
 
@@ -255,7 +358,7 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
     this->json_frontpage = frontpage_json;
     this->json_about = json_about;
     std::cout << url_prev << std::endl;
-    std::cout << "Parsing response" << std::endl;
+    std::cout << "Parsing response"  << std::endl;
     std::cout << "First post: " << this->json_response["data"]["children"][0]["data"]["title"] << std::endl;
 
   std::vector<submissionwidget::SubmissionWidget *> submission_widget_list;
@@ -282,13 +385,31 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
     int ups = this->submission_json_list[i]["data"]["ups"];
     int downs = this->submission_json_list[i]["data"]["downs"];
     signed int score = ups - downs;
+    submissionwidget::submission_type subType;
+    std::cout << submission_json_list[i] << std::endl;
+    std::string url = submission_json_list[i]["data"]["url"];
+    std::cout << url << std::endl;
+    if(url.find("i.redd.it") != std::string::npos || url.find("i.imgur.com") != std::string::npos || url.find("i.reddit.com") != std::string::npos) {
+      subType = submissionwidget::Image;
+      std::cout << "Type is Image" << std::endl;
+    } else if(url.find("v.redd.it") != std::string::npos) {
+      subType = submissionwidget::Video;
+      std::cout << "Type is Video" << std::endl;
+    } else if(url.find("reddit.com/r/") != std::string::npos) {
+      subType = submissionwidget::Text;
+      std::cout << "Type is Text" << std::endl;
+    } else {
+      subType = submissionwidget::Link;
+      std::cout << "Type is Link" << std::endl;
+    }
+
     submissionwidget::SubmissionWidget *temp_widget = new submissionwidget::SubmissionWidget(
       this->submission_json_list.at(i)["data"]["title"],
       this->submission_json_list.at(i)["data"]["selftext"],
       this->submission_json_list.at(i)["data"]["author"],
       score,
       i,
-      submissionwidget::Text
+      subType
     );
     std::cout << i << std::endl;
     temp_widget->setMinimumWidth(100);
@@ -296,12 +417,13 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
     submission_widget_list.push_back(temp_widget);
     subListLayout->addWidget(temp_widget);
   }
+  this->subredditWidget->stopSpinner();
   std::cout << this->json_about["data"]["icon_img"] << std::endl;
   std::cout << std::string(this->json_about["data"]["icon_img"]).c_str() << std::endl;
   this->view(1);
 
   for(int i = 0; i < submission_widget_list.size(); i++) {
-    std::cout << "[DBG] Submission ID: " << submission_widget_list[i]->index << std::endl;;
+    std::cout << "[DBG] Submission ID: "  << submission_widget_list[i]->index << std::endl;
     QObject::connect(submission_widget_list[i], &QPushButton::clicked, [=](){this->view(submission_widget_list[i]->index);});
   };
 }
@@ -354,6 +476,7 @@ void mainui::MainUI::view(int id) {
   if(subType == submissionwidget::Image || subType == submissionwidget::Video) {
     this->bodyLayout->setAlignment(Qt::AlignCenter);
     std::cout << "[DBG] Starting image-dl thread" << std::endl;
+    this->imageThread->quit();
     this->imageThread->deleteLater();
     this->imageThread = new QThread();
     this->imageWorker->deleteLater();
@@ -364,6 +487,12 @@ void mainui::MainUI::view(int id) {
     this->imageWorker->moveToThread(this->imageThread);
     this->imageThread->start();
     emit mainui::MainUI::doDownloadImage(url);
+  } else if(subType == submissionwidget::Link) {
+    QWebEngineView *pageview = new QWebEngineView();
+    this->bodyLayout->addWidget(pageview);
+    pageview->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+    pageview->load(QUrl(url.c_str()));
+    pageview->show();
   } else {
     this->bodyLayout->setAlignment(Qt::AlignLeft);
   }
@@ -405,11 +534,14 @@ void mainui::MainUI::view(int id) {
 
   this->subredditIconWidget->setPixmap(QPixmap("/opt/angel-reddit/temp/.subimg.png").scaled(30, 30));
   this->subredditInfoWidget->setText(QString(std::string(this->json_about["data"]["display_name"]).c_str()));
-  QLabel *selfTextLabel = new QLabel(selftextQstring);
-  selfTextLabel->setWordWrap(true);
-  selfTextLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-  selfTextLabel->setTextFormat(Qt::RichText);
-  this->bodyLayout->addWidget(selfTextLabel);
+  if(subType != submissionwidget::Link) {
+    QLabel *selfTextLabel = new QLabel(selftextQstring);
+    selfTextLabel->setWordWrap(true);
+    selfTextLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    selfTextLabel->setTextFormat(Qt::RichText);
+    selfTextLabel->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+    this->bodyLayout->addWidget(selfTextLabel);
+  }
 }
 
 size_t mainui::MainUI::writeBinaryData(void *ptr, size_t size, size_t nmemb, FILE *stream) {
@@ -431,7 +563,7 @@ void mainui::MainUI::onResponseReceived(QString request_qstr) {
   cpr::Payload params{{"grant_type", "authorization_code"}, {"code", token_c}, {"redirect_uri", "http://localhost:8800"}};
   this->authsite->deleteLater();
   cpr::Response resp = cpr::Post(cpr::Url{"https://www.reddit.com/api/v1/access_token"},
-                                 cpr::Header{{"User-Agent", "linux:com.example.angel:v1.0 (by /u/Starkiller645)"}, {"Authorization", "Basic SnEwQml1VWVJcnNyM0E6"}},
+                                 cpr::Header{{"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"Authorization", "Basic SnEwQml1VWVJcnNyM0E6"}},
                                  params);
   auto response_json = nlohmann::json::parse(resp.text);
   this->bearer_token = response_json["access_token"];
@@ -459,7 +591,7 @@ void mainui::MainUI::onResponseReceived(QString request_qstr) {
   filejson::JsonRead *read_json = new filejson::JsonRead(filename);
   QObject::connect(read_json, &filejson::JsonRead::onJsonRead, this, [=](nlohmann::json json_read){this->conf_json = json_read;});
   read_json->run();
-  std::cout << "OAuth 2 access token: " << this->conf_json["access_token"] << std::endl << "OAuth 2 refresh token: " << this->conf_json["refresh_token"] << std::endl;
+  std::cout << "OAuth 2 access token: " << this->conf_json["access_token"]<< std::endl  << "OAuth 2 refresh token: "  << this->conf_json["refresh_token"] << std::endl;
   this->switchSub("frontpage");
 }
 
@@ -497,7 +629,6 @@ void mainui::MainUI::onResponseReceived(QString request_qstr) {
         delete child;
     };
     imageLabel->setStyleSheet("padding: 0px; margin: 0px");
-    this->bodyWidget->setStyleSheet("margin: 0px; padding: 0px;");
     this->bodyLayout->addWidget(imageLabel);
     this->imageThread->quit();
   }

@@ -30,6 +30,9 @@ using namespace mainwindow;
 
 MainWindow::MainWindow() {
   this->authsite = new QWebEngineView();
+  this->signinReddit = new QPushButton();
+  this->mainLayout = new QVBoxLayout();
+  this->browse = new QPushButton();
   QLabel *label = new QLabel("<b>angel</b>v1.0");
   QLabel *angelLogo = new QLabel();
   this->loginLayout = new QVBoxLayout();
@@ -62,35 +65,39 @@ void MainWindow::runConnect() {
   QThreadPool *threadpool = new QThreadPool();
   authworker::AuthorisationWorker *receive = new authworker::AuthorisationWorker();
   this->authsite->setWindowTitle("Authenticate with Reddit");
-  this->authsite->load(QUrl("https://www.reddit.com/api/v1/authorize.compact?client_id=Jq0BiuUeIrsr3A&response_type=code&state=JDOfne0oPnf&redirect_uri=http://localhost:8800&duration=permanent&scope=identity+read"));
+  this->authsite->load(QUrl("https://www.reddit.com/api/v1/authorize.compact?client_id=Jq0BiuUeIrsr3A&response_type=code&state=JDOfne0oPnf&redirect_uri=http://localhost:8800&duration=permanent&scope=read+identity"));
   threadpool->start(receive);
   this->authsite->show();
   QObject::connect(receive, &authworker::AuthorisationWorker::onResponseReceived, this, &MainWindow::onResponseReceived);
 }
 
 void MainWindow::doSetupLoginUI() {
+  filejson::JsonRead jsonreader(std::string(std::getenv("HOME")) + std::string("/.config/angel.json"));
+  nlohmann::json conf_json = jsonreader.runSynced();
   this->spinner->deleteLater();
-  QPushButton *signinReddit = new QPushButton();
-  QPushButton *browse = new QPushButton("Browse without login");
-  browse->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+  this->signinReddit->deleteLater();
+  this->browse->deleteLater();
+  this->signinReddit = new QPushButton();
+  this->browse = new QPushButton("Browse without login");
+  this->browse->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
   this->loginLayout->addWidget(signinReddit);
   this->loginLayout->addWidget(browse);
-  signinReddit->setIconSize(QSize(300,85));
+  this->signinReddit->setIconSize(QSize(300,85));
   const QIcon redditIcon(":/images/reddit.png");
-  signinReddit->setFixedSize(redditIcon.actualSize(redditIcon.availableSizes().first()));
-  signinReddit->setIcon(redditIcon);
-  signinReddit->setStyleSheet("border-radius: 3px;");
-  QObject::connect(browse, &QPushButton::clicked, this, &MainWindow::doSetupMainUI);
-  QObject::connect(signinReddit, &QPushButton::clicked,
+  this->signinReddit->setFixedSize(redditIcon.actualSize(redditIcon.availableSizes().first()));
+  this->signinReddit->setIcon(redditIcon);
+  this->signinReddit->setStyleSheet("border-radius: 3px;");
+  QObject::connect(this->browse, &QPushButton::clicked, this, &MainWindow::doSetupMainUI);
+  QObject::connect(this->signinReddit, &QPushButton::clicked,
 	  this, &MainWindow::runConnect);
-  this->loginLayout->setAlignment(browse, Qt::AlignHCenter);
+  this->loginLayout->setAlignment(this->browse, Qt::AlignHCenter);
 }
 
 void MainWindow::checkCredentials() {
   QThread *credentialThread = new QThread();
   authworker::AuthorisationWorker *credworker = new authworker::AuthorisationWorker();
   credentialThread->setObjectName("Credential Check Thread");
-  QObject::connect(credentialThread, &QThread::started, credworker, &authworker::AuthorisationWorker::checkCredentials);
+  QObject::connect(credentialThread, &QThread::started, credworker, &authworker::AuthorisationWorker::checkCredentials, Qt::UniqueConnection);
   QObject::connect(credworker, &authworker::AuthorisationWorker::credCheckFailed, this, [=](){this->doSetupLoginUI();});
   QObject::connect(credworker, &authworker::AuthorisationWorker::credCheckSucceeded, this, [=](){this->doSetupMainUI();});
   credworker->moveToThread(credentialThread);
@@ -111,7 +118,7 @@ void MainWindow::onResponseReceived(QString request_qstr) {
   cpr::Payload params{{"grant_type", "authorization_code"}, {"code", token_c}, {"redirect_uri", "http://localhost:8800"}};
   this->authsite->deleteLater();
   cpr::Response resp = cpr::Post(cpr::Url{"https://www.reddit.com/api/v1/access_token"},
-                                 cpr::Header{{"User-Agent", "linux:com.example.angel:v1.0 (by /u/Starkiller645)"}, {"Authorization", "Basic SnEwQml1VWVJcnNyM0E6"}},
+                                 cpr::Header{{"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"Authorization", "Basic SnEwQml1VWVJcnNyM0E6"}},
                                  params);
   auto response_json = json::parse(resp.text);
   this->bearer_token = response_json["access_token"];
@@ -141,7 +148,6 @@ void MainWindow::onResponseReceived(QString request_qstr) {
   filejson::JsonRead *read_json = new filejson::JsonRead(filename);
   QObject::connect(read_json, &filejson::JsonRead::onJsonRead, this, [=](nlohmann::json json_read){this->conf_json = json_read;});
   read_json->run();
-  std::cout << "OAuth 2 access token: " << this->conf_json["access_token"] << std::endl << "OAuth 2 refresh token: " << this->conf_json["refresh_token"] << std::endl;
 
   QWidget *labels_container = new QWidget();
   const QIcon next_icon(":/images/next.svg");
@@ -180,11 +186,11 @@ void MainWindow::onResponseReceived(QString request_qstr) {
   QTimer *timer_animation = new QTimer(this);
   timer_animation->setSingleShot(true);
   connect(timer_animation, &QTimer::timeout, this, [=]() {move_up_anim->start();});
-  //timer_animation->start(800);
+  timer_animation->start(800);
   next_button->doAnimation();
 
   this->mainLayout->deleteLater();
-  this->mainLayout = new QVBoxLayout;
+  this->mainLayout = new QVBoxLayout();
   this->mainLayout->addWidget(labels_container);
   this->mainLayout->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
   this->mainWidget->setLayout(this->mainLayout);

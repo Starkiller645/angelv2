@@ -8,7 +8,6 @@
 #include <QStringLiteral>
 #include <QUrl>
 #include <QRunnable>
-#include <QtCore/QDebug>
 #include <iostream>
 #include <string>
 #include <unistd.h>
@@ -40,10 +39,10 @@ void AuthorisationWorker::run() {
   std::ostringstream httpsend_stream;
 
   /*if(QObject::connect(&sock_server, &QTcpServer::newConnection, this, &AuthorisationWorker::capture_signal)) {
-    std::cout << "Connect to capture_signal succeeded\n";
+    () std::cout << "Connect to capture_signal succeeded\n";
   };
   if(sock_server.listen(QHostAddress::Any, 8080)) {
-    std::cout << "Reddit Authorisation Worker listening on port 8080" << std::endl;*/
+    () std::cout << "Reddit Authorisation Worker listening on port 8080" std::cout << std::endl;*/
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   bzero((char *) &serv_addr, sizeof(serv_addr));
   portno = 8800;
@@ -78,7 +77,6 @@ void AuthorisationWorker::capture_signal() {
 
 void AuthorisationWorker::onEchoReceived(QString message) {
   std::cout << "Text message incoming!" << std::endl;
-  qDebug() << "Message received:" << message;
 }
 
 void AuthorisationWorker::checkCredentials() {
@@ -95,12 +93,37 @@ void AuthorisationWorker::checkCredentials() {
   try {
     std::cout << "[DBG] Attempting to parse response..." << std::endl;
     nlohmann::json json_about = nlohmann::json::parse(response.text);
-    std::cout << "[DBG] Done!" << std::endl;
+    std::cout << "[DBG] Done!"  << std::endl;
     exceptionCaught = false;
   } catch(nlohmann::detail::parse_error) {
-    emit AuthorisationWorker::credCheckFailed();
+    cpr::Header headers = cpr::Header{{"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"Authorization", "Basic SnEwQml1VWVJcnNyM0E6"}};
+    cpr::Payload refresh_payload{{"grant_type", "refresh_token"}, {"refresh_token", std::string(jsondata["refresh_token"]).c_str()}};
+    cpr::Response refresh_response = cpr::Post(cpr::Url{"https://www.reddit.com/api/v1/access_token"}, headers, refresh_payload);
+    std::cout << "Refresh Token Request Response Code: " << refresh_response.status_code << std::endl;
+    std::cout << refresh_response.text  << std::endl;
+    if(refresh_response.status_code >= 400) {
+      emit AuthorisationWorker::credCheckFailed();
+    }
+    nlohmann::json refresh_json;
+    try {
+      refresh_json = nlohmann::json::parse(refresh_response.text);
+    } catch(nlohmann::detail::parse_error) {
+      emit AuthorisationWorker::credCheckFailed();
+      return;
+    }
+    if(refresh_response.status_code == 200) {
+      std::string raw_json_data = "{\"access_token\":\"" + std::string(refresh_json["access_token"]) + "\",\"client_id\":\"Jq0BiuUeIrsr3A\",\"refresh_token\":\"" + std::string(jsondata["refresh_token"]) + "\",\"user_agent\":\"angel/v1.0 (by /u/Starkiller645)\"}";
+      filejson::JsonWrite jsonwrite(nlohmann::json::parse(raw_json_data), filename);
+      jsonwrite.run();
+      emit AuthorisationWorker::credCheckSucceeded();
+      return;
+    } else {
+      emit AuthorisationWorker::credCheckFailed();
+      return;
+    }
   } if(!exceptionCaught) {
     emit AuthorisationWorker::credCheckSucceeded();
+    return;
   }
 }
 
@@ -126,7 +149,6 @@ void AuthorisationWorker::switchSub () {
 void AuthorisationWorker::downloadImageFile(std::string url) {
   std::string fileExtension = url.substr(url.rfind("."));
   std::string filename = "/opt/angel-reddit/temp/.img." + fileExtension;
-  std::cout << filename << std::endl;
   CURL *curl;
   FILE *fp;
   CURLcode res;
@@ -141,7 +163,6 @@ void AuthorisationWorker::downloadImageFile(std::string url) {
       curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
       curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, buffer);
       res = curl_easy_perform(curl);
-      std::cout << res << std::endl;
       /* always cleanup */
       curl_easy_cleanup(curl);
       fclose(fp);

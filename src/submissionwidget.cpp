@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QPixmap>
 #include <QHBoxLayout>
+#include <iostream>
 #include <QVBoxLayout>
 #include <string>
 
@@ -17,6 +18,7 @@ submissionwidget::SubmissionWidget::SubmissionWidget(std::string title,
   this->submission_widget = new QWidget();
   this->index = id;
   this->info_widget = new QWidget();
+  std::cout << type << std::endl;
 
   this->main_layout = new QHBoxLayout();
   this->info_layout = new QHBoxLayout();
@@ -28,16 +30,23 @@ submissionwidget::SubmissionWidget::SubmissionWidget(std::string title,
   this->longname = id;
   switch(type) {
     case submissionwidget::submission_type::Image:
+      std::cout << "Type is Image" << std::endl;
       this->submission_icon_pixmap.load(":/images/icon-image.svg");
+      break;
     case submissionwidget::submission_type::Video:
+      std::cout << "Type is Video" << std::endl;
       this->submission_icon_pixmap.load(":/images/icon-video.svg");
+      break;
     case submissionwidget::submission_type::Text:
+      std::cout << "Type is Text" << std::endl;
       this->submission_icon_pixmap.load(":/images/icon-text.svg");
+      break;
     case submissionwidget::submission_type::Link:
+      std::cout << "Type is Link" << std::endl;
       this->submission_icon_pixmap.load(":/images/icon-link.svg");
+      break;
   };
-  this->submission_icon_pixmap = this->submission_icon_pixmap.scaledToWidth(10, Qt::SmoothTransformation);
-
+  this->submission_icon_pixmap = this->submission_icon_pixmap.scaledToWidth(20, Qt::SmoothTransformation);
   this->submission_icon = new QLabel();
   this->submission_icon->setPixmap(this->submission_icon_pixmap);
 
@@ -63,6 +72,7 @@ submissionwidget::SubmissionWidget::SubmissionWidget(std::string title,
   this->info_layout->setAlignment(Qt::AlignLeft);
   this->submission_score->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
   this->submission_author->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
-  this->submission_icon->setMaximumWidth(20);
+  this->submission_icon->setMaximumWidth(30);
+  this->submission_icon->setFixedHeight(30);
   this->submission_icon->setStyleSheet("padding: 5px;");
 }

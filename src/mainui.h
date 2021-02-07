@@ -49,6 +49,8 @@ namespace mainui {
     QLabel *authorInfoWidget;
     QLabel *subredditInfoWidget;
     QLabel *subredditIconWidget;
+    QVBoxLayout *searchResultsLayout;
+    QTimer *searchTimeoutTimer;
     nlohmann::json jsondata;
     nlohmann::json json_response;
     nlohmann::json json_about;
@@ -63,6 +65,7 @@ namespace mainui {
     QPushButton *goButton;
     QLineEdit *searchTextEdit;
     QThread *imageThread;
+    bool isSidebarOut;
     authworker::AuthorisationWorker *imageWorker;
   signals:
     void doDownloadImage(std::string);
@@ -74,8 +77,11 @@ namespace mainui {
     void switchSub(std::string);
     void view(int);
     void onResponseReceived(QString);
+    void doGetSearchSubs();
+    void updateSubList(nlohmann::json);
     static size_t writeBinaryData(void*, size_t, size_t, FILE*);
   public slots:
+    void onSearchTextUpdate();
     void setSubmissionImage(std::string);
     void onSwitchSubComplete(std::string, nlohmann::json, nlohmann::json, nlohmann::json);
   };
