@@ -13,11 +13,12 @@
 #include <QtWebSockets/QWebSocketServer>
 
 namespace authworker {
+  enum switch_type {New, Update};
   using namespace Qt;
   class AuthorisationWorker: public QObject, public QRunnable {
       Q_OBJECT
     public:
-      AuthorisationWorker(std::string sub = "frontpage");
+      AuthorisationWorker(std::string sub = "frontpage", authworker::switch_type type = authworker::New, std::string before = "");
       void run() override;
     public slots:
       void ready_Read();
@@ -29,10 +30,12 @@ namespace authworker {
       void credCheckSucceeded();
       void onResponseReceived(QString);
       void onDownloadImageFile(std::string);
-      void onSwitchSubComplete(std::string, nlohmann::json, nlohmann::json, nlohmann::json);
+      void onSwitchSubComplete(std::string, nlohmann::json, nlohmann::json, nlohmann::json, std::string);
     private:
       std::string sub;
+      authworker::switch_type type;
       filejson::JsonRead *json;
+      std::string before;
   };
 };
 

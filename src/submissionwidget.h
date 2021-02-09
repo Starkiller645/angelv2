@@ -15,6 +15,7 @@ namespace submissionwidget {
   public:
     SubmissionWidget(std::string, std::string, std::string, int, int, submissionwidget::submission_type);
     int index;
+    std::string title;
   private:
     QLabel *submission_title;
     QLabel *submission_icon;

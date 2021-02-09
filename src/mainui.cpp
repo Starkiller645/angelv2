@@ -9,9 +9,12 @@
 #include <QWidget>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QAbstractSlider>
 #include <QMetaType>
 #include <QPropertyAnimation>
 #include <QTimer>
+#include <QScrollBar>
+#include <QMovie>
 #include <QIcon>
 #include <QFile>
 #include <QThreadPool>
@@ -76,6 +79,7 @@ mainui::MainUI::MainUI() {
   this->subredditWidget->external_layout->addWidget(searchButton);
   this->isSidebarOut = false;
 
+  this->inc = 0;
   this->switchSub("frontpage");
 
   this->subredditWidget->setStyleSheet("background-color: #232629;");
@@ -85,7 +89,6 @@ mainui::MainUI::MainUI() {
   this->bottomBarWidget->setStyleSheet("background-color: #eff0f1; color: #232629;");
   this->subredditWidget->setMaximumHeight(120);
   this->subListWidget->setStyleSheet("background-color: #232629; border: 0px;");
-
   // Widgets under this->topBarWidget
   this->subListWidget->setLayout(this->subListLayout);
   this->subListWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -162,6 +165,7 @@ mainui::MainUI::MainUI() {
   timer_animation2->setSingleShot(true);
   QObject::connect(timer_animation2, &QTimer::timeout, [=](){mainui::MainUI::toggleSideBar(mainui::SidebarButton::Search);});
   timer_animation2->start(8000);*/
+  this->loadingLabel = new QLabel("Loading...");
 }
 
 void mainui::MainUI::toggleSideBar(mainui::SidebarButton type = mainui::SidebarButton::Search) {
@@ -322,24 +326,32 @@ void mainui::MainUI::updateSubList(nlohmann::json jsondata) {
 }
 
 void mainui::MainUI::switchSub(std::string sub) {
+  std::cout << "[DBG] Switching sub..." << std::endl;
   if(this->isSidebarOut) {
     this->toggleSideBar();
   }
-  this->subredditWidget->startSpinner();
   this->subredditWidget->setName(sub);
   QThread *switchSubThread = new QThread();
   std::string filename = std::string(std::getenv("HOME")) + std::string("/.config/angel.json");
   filejson::JsonRead *json = new filejson::JsonRead(filename);
   this->jsondata = json->runSynced();
-  authworker::AuthorisationWorker *switchSubWorker = new authworker::AuthorisationWorker(sub);
+  authworker::AuthorisationWorker *switchSubWorker;
+  if(this->sub != sub) {
+    this->inc = 0;
+    switchSubWorker = new authworker::AuthorisationWorker(sub);
+    this->subredditWidget->startSpinner();
+  } else {
+    switchSubWorker = new authworker::AuthorisationWorker(sub, authworker::Update, this->before);
+  }
   QObject::connect(switchSubThread, &QThread::started, switchSubWorker, &authworker::AuthorisationWorker::switchSub);
-  QObject::connect(switchSubWorker, &authworker::AuthorisationWorker::onSwitchSubComplete, this, &mainui::MainUI::onSwitchSubComplete);
+  QObject::connect(switchSubWorker, &authworker::AuthorisationWorker::onSwitchSubComplete, this, &mainui::MainUI::onSwitchSubComplete, Qt::UniqueConnection);
   switchSubWorker->moveToThread(switchSubThread);
   switchSubThread->start();
 }
 
-void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json response_json, nlohmann::json json_about, nlohmann::json frontpage_json) {
+void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json response_json, nlohmann::json json_about, nlohmann::json frontpage_json, std::string before) {
   std::string url_prev = std::string(json_about["data"]["icon_img"]);
+  this->before = before;
   this->downloadUrlData(url_prev, std::string("/opt/angel-reddit/temp/.subimg.png"));
   if(sub != "frontpage") {
     this->subredditWidget->setSubscribers(json_about["data"]["subscribers"]);
@@ -353,27 +365,35 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
     this->json_frontpage = frontpage_json;
     this->json_about = json_about;
 
-  std::vector<submissionwidget::SubmissionWidget *> submission_widget_list;
-
-  QLayoutItem *child;
-  while ((child = this->subListLayout->takeAt(0)) != nullptr) {
-      delete child->widget();
-      delete child;
+  if(this->sub != sub) {
+    QLayoutItem *child;
+    while ((child = this->subListLayout->takeAt(0)) != nullptr) {
+        delete child->widget();
+        delete child;
+    };
+    this->submission_widget_list.clear();
+    this->submission_json_list.clear();
   };
 
-  this->submission_json_list.clear();
 
-  for(int i = 0; i < 25; i++) {
+
+  for(int i = inc; i < inc + 25; i++) {
     if(sub == "frontpage") {
-      nlohmann::json temp_json = this->json_frontpage["data"]["children"][i];
+      nlohmann::json temp_json = this->json_frontpage["data"]["children"][i - inc];
       this->submission_json_list.push_back(temp_json);
     } else {
-      nlohmann::json temp_json = this->json_response["data"]["children"][i];
+      nlohmann::json temp_json = this->json_response["data"]["children"][i - inc];
+      std::cout << temp_json << std::endl;
       this->submission_json_list.push_back(temp_json);
     }
   }
+  std::cout << this->submission_json_list.size() << std::endl;
 
-  for(int i = 0; i < this->submission_json_list.size(); i++) {
+  std::cout << "[DBG] Creating new widgets..." << std::endl;
+  std::cout << this->inc << std::endl << this->submission_widget_list.size() << std::endl;
+  for(int i = inc; i < (inc + 25); i++) {
+    std::cout << i << std::endl;
+    std::cout << this->submission_json_list[i].dump() << std::endl;
     int ups = this->submission_json_list[i]["data"]["ups"];
     int downs = this->submission_json_list[i]["data"]["downs"];
     signed int score = ups - downs;
@@ -388,7 +408,7 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
     } else {
       subType = submissionwidget::Link;
     }
-
+    std::cout << "[DBG] Performing creation..." << std::endl;
     submissionwidget::SubmissionWidget *temp_widget = new submissionwidget::SubmissionWidget(
       this->submission_json_list.at(i)["data"]["title"],
       this->submission_json_list.at(i)["data"]["selftext"],
@@ -398,19 +418,42 @@ void mainui::MainUI::onSwitchSubComplete(std::string sub, nlohmann::json respons
       subType
     );
     temp_widget->setMinimumWidth(100);
-
-    submission_widget_list.push_back(temp_widget);
-    subListLayout->addWidget(temp_widget);
+    std::cout << "[DBG] Done!" << std::endl;
+    this->submission_widget_list.push_back(temp_widget);
   }
-  this->subredditWidget->stopSpinner();
-  this->view(1);
 
-  for(int i = 0; i < submission_widget_list.size(); i++) {
-    QObject::connect(submission_widget_list[i], &QPushButton::clicked, [=](){this->view(submission_widget_list[i]->index);});
+  for(int i = inc; i < (inc + 25); i++) {
+    this->subListLayout->addWidget(this->submission_widget_list[i]);
+  }
+
+  std::cout << "[DBG] Starting view() function..." << std::endl;
+  this->subredditWidget->stopSpinner();
+  if(this->sub != sub) {
+    this->view(1);
   };
+
+  std::cout << "[DBG] Done!\n[DBG] Connecting signals to slots..." << std::endl;
+  std::cout << this->inc << std::endl << this->submission_widget_list.size() << std::endl;
+  for(int i = inc; i < (inc + 25); i++) {
+    QObject::connect(this->submission_widget_list[i], &QPushButton::clicked, [=](){this->view(this->submission_widget_list[i]->index);});
+    std::cout << this->submission_widget_list[i]->index << std::endl;
+    std::cout << this->submission_widget_list[i]->title << std::endl;
+  };
+  std::cout << "[DBG] Done!" << std::endl;
+  this->sub = sub;
+  std::cout << "[DBG] Starting timer..." << std::endl;
+  QTimer *flag_timer = new QTimer();
+  flag_timer->setSingleShot(true);
+  QObject::connect(flag_timer, &QTimer::timeout, [=](){this->subUpdateFlag = true;});
+  flag_timer->start(3000);
+  this->inc += 25;
+  std::cout << "[DBG] Done!";
+  QObject::connect(this->subScroll->verticalScrollBar(), &QScrollBar::valueChanged, this, &mainui::MainUI::onSlideChange, Qt::UniqueConnection);
+  std::cout << "[DBG] Finished onSwitchSubComplete" << std::endl;
 }
 
 void mainui::MainUI::view(int id) {
+  this->imageThread->quit();
   QLayoutItem *child;
   while ((child = this->bodyLayout->takeAt(0)) != nullptr) {
       delete child->widget();
@@ -443,7 +486,7 @@ void mainui::MainUI::view(int id) {
   selftext = htmlOutput;
   std::string url = temp_json["data"]["url"];
 
-  if(url.find("i.redd.it") != std::string::npos || url.find("i.imgur.com") != std::string::npos || url.find("i.reddit.com") != std::string::npos) {
+  if((url.find("i.redd.it") != std::string::npos || url.find("i.imgur.com") != std::string::npos || url.find("i.reddit.com") != std::string::npos) && url.find(".gifv") == std::string::npos) {
     subType = submissionwidget::Image;
   } else if(url.find("v.reddit.com") != std::string::npos) {
     subType = submissionwidget::Video;
@@ -455,7 +498,7 @@ void mainui::MainUI::view(int id) {
 
   if(subType == submissionwidget::Image || subType == submissionwidget::Video) {
     this->bodyLayout->setAlignment(Qt::AlignCenter);
-    this->imageThread->quit();
+    this->imageThread->terminate();
     this->imageThread->deleteLater();
     this->imageThread = new QThread();
     this->imageWorker->deleteLater();
@@ -512,6 +555,7 @@ void mainui::MainUI::view(int id) {
     selfTextLabel->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
     this->bodyLayout->addWidget(selfTextLabel);
   }
+  std::cout << "before: " << this->before << std::endl;
 }
 
 size_t mainui::MainUI::writeBinaryData(void *ptr, size_t size, size_t nmemb, FILE *stream) {
@@ -586,20 +630,62 @@ void mainui::MainUI::onResponseReceived(QString request_qstr) {
     return filename;
   }
   void mainui::MainUI::setSubmissionImage(std::string filename) {
-    const QPixmap pixmap(filename.c_str());
-    QLabel *imageLabel = new QLabel();
-    QSize original_size = this->bodyWidget->size();
-    QSize new_size(original_size.width() - 16, original_size.height() - 16);
-    imageLabel->setPixmap(pixmap.scaled(new_size, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     QLayoutItem *child;
     while ((child = this->bodyLayout->takeAt(0)) != nullptr) {
         delete child->widget();
         delete child;
     };
-    imageLabel->setStyleSheet("padding: 0px; margin: 0px");
-    this->bodyLayout->addWidget(imageLabel);
-    this->imageThread->quit();
+
+    if(filename.substr(filename.rfind(".")) == ".gif") {
+      QMovie *gifMovie = new QMovie(filename.c_str());
+      QLabel *imageLabel = new QLabel();
+      this->bodyLayout->addWidget(imageLabel);
+
+
+      // Thanks to:
+      // http://blog.ssokolow.com/archives/2019/08/14/displaying-an-image-or-animated-gif-in-qt-with-aspect-ratio-preserving-scaling/
+      // for the aspect-preserving scaling code, converted from Python
+
+      QSize original_size = this->bodyWidget->size();
+      original_size = QSize(original_size.width() - 16, original_size.height() - 16);
+      gifMovie->jumpToFrame(0);
+      QSize movie_size = gifMovie->currentImage().size();
+      int movie_aspect = movie_size.width() / movie_size.height();
+
+
+      QSize rect = original_size;
+      QSize new_size;
+      int width = rect.height() * movie_aspect;
+      if(width <= rect.width()) {
+        new_size = QSize(width, rect.height());
+      } else {
+        int height = rect.width() / movie_aspect;
+        new_size = QSize(rect.width(), height);
+      };
+
+      gifMovie->setScaledSize(new_size);
+      imageLabel->setMovie(gifMovie);
+      gifMovie->start();
+    } else {
+      const QPixmap pixmap(filename.c_str());
+      QLabel *imageLabel = new QLabel();
+      QSize original_size = this->bodyWidget->size();
+      QSize new_size(original_size.width() - 16, original_size.height() - 16);
+      imageLabel->setPixmap(pixmap.scaled(new_size, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+      imageLabel->setStyleSheet("padding: 0px; margin: 0px");
+      this->bodyLayout->addWidget(imageLabel);
+    }
   }
+
+  void mainui::MainUI::onSlideChange(int value) {
+    float currentValue = static_cast<float>(value);
+    float maximumValue = static_cast<float>(this->subScroll->verticalScrollBar()->maximum());
+    if((currentValue / maximumValue) >= 0.7 && this->subUpdateFlag) {
+      this->subUpdateFlag = false;
+      this->switchSub(this->sub);
+    }
+  }
+
 
 Q_DECLARE_METATYPE(std::string);
 Q_DECLARE_METATYPE(nlohmann::json);

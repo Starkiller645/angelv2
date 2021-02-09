@@ -18,6 +18,7 @@ submissionwidget::SubmissionWidget::SubmissionWidget(std::string title,
   this->submission_widget = new QWidget();
   this->index = id;
   this->info_widget = new QWidget();
+  this->title = title;
 
   this->main_layout = new QHBoxLayout();
   this->info_layout = new QHBoxLayout();

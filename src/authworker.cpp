@@ -2,6 +2,7 @@
 #include "filejson.h"
 #include <QtWebSockets/QWebSocketServer>
 #include <QtWebSockets/QWebSocket>
+#include <iomanip>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QHostAddress>
@@ -30,8 +31,11 @@ int n;
 std::string httpsend;
 
 
-AuthorisationWorker::AuthorisationWorker(std::string sub) {
+AuthorisationWorker::AuthorisationWorker(std::string sub, authworker::switch_type type, std::string before) {
   this->sub = sub;
+  this->type = type;
+  this->before = before;
+  std::cout << "before: " << before << std::endl;
   return;
 }
 
@@ -72,7 +76,14 @@ void AuthorisationWorker::checkCredentials() {
   cpr::Url frontpage_url{"https://oauth.reddit.com"};
   std::string authparam = jsondata["access_token"];
   authparam = "bearer " + authparam;
-  cpr::Header headers{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
+  cpr::Header headers;
+  if(this->before != "") {
+    headers = {{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}};
+    cpr::Parameters params{{"before", this->before.c_str()}};
+  } else {
+    headers = {{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}};
+    cpr::Parameters params{{"limit", "100"}};
+  };
   cpr::Response response = cpr::Get(frontpage_url, headers);
   bool exceptionCaught = true;
   try {
@@ -111,20 +122,44 @@ void AuthorisationWorker::checkCredentials() {
 void AuthorisationWorker::switchSub () {
   std::string filename = std::string(std::getenv("HOME")) + std::string("/.config/angel.json");
   cpr::Url frontpage_url{"https://oauth.reddit.com"};
-  cpr::Url url{"https://oauth.reddit.com/r/" + this->sub + "/hot"};
-  cpr::Url about_url{"https://oauth.reddit.com/r/" + this->sub + "/about"};
+  cpr::Url url{"https://oauth.reddit.com/r/" + this->sub + "/hot.json"};
+  cpr::Url about_url{"https://oauth.reddit.com/r/" + this->sub + "/about.json"};
   filejson::JsonRead *json = new filejson::JsonRead(filename);
   nlohmann::json jsondata = json->runSynced();
   std::string authparam = jsondata["access_token"];
   authparam = "bearer " + authparam;
-  cpr::Header headers{{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}, {"limit", "100"}};
-  cpr::Response response = cpr::Get(url, headers);
-  cpr::Response about_sub = cpr::Get(about_url, headers);
+  cpr::Header headers;
+  cpr::Parameters params;
+  cpr::Response response;
+  if(this->before != "") {
+    headers = {{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}};
+    params = {{"sort", "hot"}, {"show", "all"}, {"t", "all"}, {"after", this->before.c_str()}};
+    response = cpr::Get(url, headers, params);
+  } else {
+    headers = {{"Authorization", authparam.c_str()}, {"User-Agent", "angel/v1.0 (by /u/Starkiller645)"}};
+    params = {{"sort", "hot"}, {"show", "all"}, {"t", "all"}, {"after", this->before.c_str()}};
+    response = cpr::Get(url, headers, params);
+  };
+
+  cpr::Response about_sub = cpr::Get(about_url, headers, params);
   cpr::Response frontpage_response = cpr::Get(frontpage_url, headers);
   nlohmann::json json_about = nlohmann::json::parse(about_sub.text);
   nlohmann::json json_response = nlohmann::json::parse(response.text);
+  try {
+    before = json_response["data"]["after"];
+    std::cout << json_response["data"]["after"] << std::endl;
+  } catch(nlohmann::detail::type_error) {
+    try {
+      std::cout << json_response["data"]["before"] << std::endl;
+      before = "none";
+    } catch(nlohmann::detail::type_error) {
+      before = "none";
+    }
+
+  };
+
   nlohmann::json json_frontpage = nlohmann::json::parse(frontpage_response.text);
-  emit AuthorisationWorker::onSwitchSubComplete(sub, json_response, json_about, json_frontpage);
+  emit AuthorisationWorker::onSwitchSubComplete(sub, json_response, json_about, json_frontpage, before);
 }
 
 void AuthorisationWorker::downloadImageFile(std::string url) {

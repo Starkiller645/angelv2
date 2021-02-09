@@ -13,6 +13,7 @@
 #include <curl/curl.h>
 
 #include "subredditwidget.h"
+#include "submissionwidget.h"
 #include "authworker.h"
 
 namespace mainui {
@@ -22,6 +23,7 @@ namespace mainui {
     QWebEngineView *authsite;
     QWidget *mainWidget;
     QHBoxLayout *mainLayout;
+    int inc;
     QWidget *sideBarWidget;
     QVBoxLayout *sideBarLayout;
     subredditwidget::SubredditWidget *subredditWidget;
@@ -49,14 +51,20 @@ namespace mainui {
     QLabel *authorInfoWidget;
     QLabel *subredditInfoWidget;
     QLabel *subredditIconWidget;
+    QLabel *loadingLabel;
     QVBoxLayout *searchResultsLayout;
     QTimer *searchTimeoutTimer;
     nlohmann::json jsondata;
     nlohmann::json json_response;
     nlohmann::json json_about;
     nlohmann::json json_frontpage;
+    bool subUpdateFlag;
+    std::vector<submissionwidget::SubmissionWidget *> submission_widget_list;
     std::string bearer_token;
     std::string refresh_token;
+    std::string currentSub;
+    std::string sub;
+    std::string before;
     nlohmann::json conf_json;
     cpr::Header headers;
     std::vector<nlohmann::json> submission_json_list;
@@ -83,7 +91,8 @@ namespace mainui {
   public slots:
     void onSearchTextUpdate();
     void setSubmissionImage(std::string);
-    void onSwitchSubComplete(std::string, nlohmann::json, nlohmann::json, nlohmann::json);
+    void onSlideChange(int);
+    void onSwitchSubComplete(std::string, nlohmann::json, nlohmann::json, nlohmann::json, std::string);
   };
 }
 
